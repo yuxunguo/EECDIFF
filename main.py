@@ -389,7 +389,7 @@ if __name__ == '__main__':
     '''
 
     gammainit=np.array([0.7,0.7])
-    theta_lst = np.linspace(0, 0.4, 100)
+    theta_lst = np.exp(np.linspace(np.log(10**(-4)), np.log(0.1), 100))
     Q_lst = np.linspace(20, 100, 5)
     
     bmax = 1.5

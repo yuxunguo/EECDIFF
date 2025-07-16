@@ -1,6 +1,6 @@
 EEC Resummed Calculation with di-hadron fragmentation functions
 
-This Python module provides a complete pipeline for evolving quark-gluon Generalized Parton Distributions (GPDs) and computing **resummed Energy-Energy Correlators (EECs)** using QCD inputs and Sudakov evolution techniques.
+This Python module provides a complete pipeline for computing **resummed Energy-Energy Correlators (EECs)** using di-hadron fragmentation functions
 
 ---
 
@@ -10,17 +10,13 @@ This code follows a layered approach to QCD evolution, starting from the one-loo
 
 ### ✅ `evolop(j, nf, p, mu, mu_init, nloop)`
 Implements the **standard one-loop evolution operator** in Mellin space.  
-It diagonalizes the LO singlet anomalous dimension matrix and constructs the evolution factor:  
-\[
-E(j, \mu, \mu_0) = \sum_{a=\pm} P_a \left( \frac{\alpha_s(\mu)}{\alpha_s(\mu_0)} \right)^{-\gamma_a/\beta_0}
-\]
 - This function is **universal** and **tested**.
 - Depends on `singlet_LO()`, `lambdaf()`, and `projectors()`.
 
 ---
 
 ### 🔁 `Gamma_Evo(Gamma_Init, mu)`
-Evolves the quark/gluon Sudakov form factors `Gamma` from an initial scale `mu0 = 2 GeV` to a new scale `mu`.
+Evolves the quark/gluon di-hadron FFs moments `Gamma` from an initial scale `mu0 = 2 GeV` to a new scale `mu`.
 
 Uses the identity:
 \[
@@ -31,14 +27,10 @@ This reformulation simplifies evolution by working with $\Gamma' = 1 - \Gamma$.
 ---
 
 ### 📈 `Gamma_tilde_Perturbative_Evo(Gamma_Init, mu, bT)`
-Computes the **perturbative part** of the resummed form factor $\tilde{\Gamma}(Q, b_T)$ using:
+Computes the **perturbative part** of the resummed di-hadron FFs moments $\tilde{\Gamma}(Q, b_T)$ using:
 
-1. Evolution from $\mu_0 \rightarrow \mu_b = \frac{2 e^{-\gamma_E}}{b_T}$
-2. Evolution from $\mu_b \rightarrow \mu$
-
-\[
-\tilde{\Gamma}^{\text{pert}}(\mu, b_T) = \Gamma(\mu_b) \cdot E(\mu, \mu_b)
-\]
+1. Evolution of `Gamma` from $\mu_0 \rightarrow \mu_b = \frac{2 e^{-\gamma_E}}{b_T}$
+2. Resummation of large logs between $\mu_b \rightarrow \mu$
 
 ---
 

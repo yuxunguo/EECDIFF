@@ -1,4 +1,4 @@
-# GPD Evolution and Resummed EEC Calculation
+EEC Resummed Calculation with di-hadron fragmentation functions
 
 This Python module provides a complete pipeline for evolving quark-gluon Generalized Parton Distributions (GPDs) and computing **resummed Energy-Energy Correlators (EECs)** using QCD inputs and Sudakov evolution techniques.
 

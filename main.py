@@ -9,6 +9,9 @@ from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.text import Text
 from matplotlib.patches import Patch,Rectangle
+from scipy.integrate import solve_ivp
+from scipy.interpolate import interp1d
+from functools import cache 
 
 NC = 3
 CF = (NC**2 - 1) / (2 * NC)
@@ -186,6 +189,7 @@ def projectors(n: complex, nf: int, p: int, prty: int = 1) -> Tuple[np.ndarray, 
     pr = np.stack([prp, prm], axis=-3) # (N, 2, 2, 2)
     return lam, pr # (N, 2) and (N, 2, 2, 2)
 
+@cache
 def evolop(j: complex, nf: int, p: int, mu: float, mu_init: float, nloop_alphaS: int):
     """Leading order GPD evolution operator E(j, nf, mu)[a,b].
 
@@ -228,47 +232,189 @@ def evolop(j: complex, nf: int, p: int, mu: float, mu_init: float, nloop_alphaS:
 
     return evola0 # (N) and (N, 2, 2)
 
+@cache
+def adimLO(nf: int):
+    
+    cf = CF
+    ca = CA
+    
+    gTqq0 = 25/6 * cf
+    gTgq0 = - 7/6 * cf
+    gTqg0 = - 7/15 * nf
+    gTgg0 = 14/5 * ca + 2/3 * nf
+    
+    return np.array([[gTqq0,gTqg0],
+                    [gTgq0,gTgg0]])
+@cache
+def adimNLO(nf: int):
+    
+    z2=zeta(2)
+    z3=zeta(3)
+    cf = CF
+    ca = CA
+    
+    gTqq1 = (-5453/1800*cf*nf + cf**2*(-1693/48 + 24*z2 - 16*z3)
+                 + ca*cf*(459/8 - 86*z2/3 + 8*z3) )
+    gTgq1 = ca*cf*(-39451/5400 - 14*z2/3) + cf**2*(-2977/432 + 28*z2/3)
+    gTqg1 = -833/216*cf*nf - 4/25*nf**2 + ca*nf*(619/2700 + 28*z2/15)
+    gTgg1 = (12839/5400*cf*nf + ca*nf*(3803/1350 - 16*z2/3)
+            + ca**2*(2158/675 + 52*z2/15 - 8*z3))
+    
+    return np.array([[gTqq1,gTqg1],
+                    [gTgq1,gTgg1]])
+@cache
+def adimNNLO(nf: int):
+    
+    z2=zeta(2)
+    z3=zeta(3)
+    z4=zeta(4)
+    z5=zeta(5)
+    cf = CF
+    ca = CA
+    
+    gTqq2 = ((112*z5+48*z2*z3-2083/3*z4+16153/18*z3-13105/72*z2-3049531/31104)*cf*ca**2
+            +(-432*z5-208*z2*z3+8252/3*z4-19424/9*z3-16709/27*z2+20329835/15552)*cf**2*ca
+            +(416*z5+224*z2*z3-6172/3*z4+10942/9*z3+11797/18*z2-17471825/15552)*cf**3
+            +(146971/2700*z2-5803/45*z3+68/3*z4-25234031/1944000)*ca*cf*nf
+            +(-9767/225*z2+8176/45*z3-136/3*z4-4100189/64800)*cf**2*nf
+            -105799/162000*cf*nf**2)
+    
+    gTgq2 = ((-17093053/777600-50593/600*z2-2791/90*z3+196/3*z4)*cf*ca**2
+                +(63294389/388800+123773/900*z2-3029/9*z3+511/3*z4)*cf**2*ca
+                +(-647639/3888+3193/54*z2+2533/9*z3-308*z4)*cf**3
+                +(-73/27*z2+182/9*z3+246767/60750)*ca*cf*nf
+                +(-419593/81000+4/9*z2-28/9*z3)*cf**2*nf)
+    
+    gTqg2 = ((239959/13500*z2+343/45*z3-252/5*z4-1795237/1944000)*ca**2*nf
+            +(34127/1350*z2+6208/75*z3-42/5*z4-3607891/38880)*ca*cf*nf
+            +(-2042/225*z2-26102/225*z3+448/15*z4+9397651/97200)*cf**2*nf
+            +(-554/135*z2-28/9*z3+1215691/121500)*ca*nf**2
+            +(2738/675*z2-10657/4050)*cf*nf**2-172/1125*nf**3)
+    
+    gTgg2 = ((96*z5+64*z2*z3-2566/15*z4-23702/225*z3+66358/1125*z2-5819653/486000)*ca**3
+            +(-12230737/1944000-51269/540*z2+239/9*z3+104*z4)*ca**2*nf
+            +(-1700563/108000-16291/675*z2+282/5*z3)*ca*cf*nf
+            +(219077/194400+2411/675*z2-28/9*z3)*cf**2*nf
+            +(-18269/10125-64/9*z3+160/27*z2)*ca*nf**2+(-2611/162000-196/135*z2)*cf*nf**2)
+    
+    return np.array([[gTqq2,gTqg2],
+                    [gTgq2,gTgg2]])
+
+def adimsum(AS: float, nloop: int, nf: int):
+    if(nloop>3):
+        assert "Not implemented yet!"
+    adimlst = np.array([adimLO(nf),adimNLO(nf),adimNNLO(nf)])
+    aslst = np.array([AS,AS**2,AS**3])
+    
+    return np.einsum('n,nml->ml', aslst[:nloop], adimlst[:nloop])
+
+def betaLO(nf: int):
+    ca=CA
+    return 11/3*ca-2/3*nf
+
+def betaNLO(nf: int):
+    ca=CA
+    cf=CF
+    return 34/3*ca**2-10/3*ca*nf-2*cf*nf
+
+def betaNNLO(nf: int):
+    ca=CA
+    cf=CF
+    return (2857/54*ca**3-1415/54*ca**2*nf-205/18*ca*cf*nf+cf**2*nf
+            +11/9*cf*nf**2+79/54*ca*nf**2)
+
+'''
+@cache
+def evolop_adapt(mu: float, muinit: float, nlooplog: int, rtol=1e-10, atol=1e-12):
+    
+    t_vals = np.linspace(np.log(muinit), np.log(mu), 300)
+    
+    AS_vals = [AlphaS(3,5,np.exp(t))/(4*np.pi) for t in t_vals]
+    
+    AS_interp = interp1d(t_vals, AS_vals, kind='cubic', fill_value='extrapolate')
+
+    # RHS of the evolution equation dU/dt = γ(α_s(t)) U
+    def rhs(t, U_flat):
+        U = U_flat.reshape((2, 2))
+        ASt = AS_interp(t)
+        gamma = adimsum(ASt,nlooplog,5)
+        return (-2*gamma @ U).flatten()
+
+    # Initial condition: identity matrix
+    U0 = np.eye(2).flatten()
+
+    # Integrate from t0 to t1
+    sol = solve_ivp(rhs, [t_vals[0], t_vals[-1]], U0, rtol=rtol, atol=atol)
+
+    # Final evolution operator
+    U_final = sol.y[:, -1].reshape((2, 2))
+    return U_final
+'''
+def HqHg(mu: float, nloop: int):
+    cf=CF
+    ca=CA
+    z2=zeta(2)
+    z3=zeta(3)
+    z4=zeta(4)
+    nf=5
+    
+    AS = AlphaS(3,5,mu)/(4*np.pi)
+    aslst  = np.array([1,AS,AS**2])
+    heelst = np.array([[1/2,0],
+                       [cf * 131/16, cf * ( - 71/48 )],
+                       [(( 16*z4 - 293/3*z3 - 83/2*z2 + 2386397/10368 ) * ca*cf
+                        + ( -32*z4 + 254/3*z3 + 1751/72*z2 - 1105289/20736 ) * cf**2
+                        + (4*z3+59/60*z2-8530817/432000) * cf*nf),
+                        (( - 19/3*z3 + 47/45*z2 - 29802739/1296000 ) * ca*cf
+                            + ( 31/3*z3 + 523/72*z2 - 674045/20736 ) * cf**2)]])
+    
+    return np.einsum('i,ij->j',aslst[:nloop],heelst[:nloop])
 
 J = 3 - 1
 NF = 5
 P = 1
 nloop = 3
 mu0 = 2
-    
-    
-def Gamma_Evo(Gamma_Init: np.array, mu: float):
+#nlooplog = 3
+
+def Gamma_Evo(Gamma_Init: np.array, mu: float, nlooplog: int):
     
     Evo0 = evolop(J, NF, P, mu, mu0, nloop)
+    #Evo0=evolop_adapt(mu,mu0,nlooplog)
     Gamma_mu = 1 - np.einsum('i,ij->j', 1-Gamma_Init, Evo0)
     
     return Gamma_mu
 
-def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.array, mu:float, bT: float):
+def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.array, mu:float, bT: float, nlooplog):
     
     mub = 2 * np.exp(-np.euler_gamma) /bT
-    Gamma_mub = Gamma_Evo(Gamma_Init, mub)
+    Gamma_mub = Gamma_Evo(Gamma_Init, mub,nlooplog)
 
     Evo = evolop(J, NF, P, mu, mub, nloop)
+    #Evo = evolop_adapt(mu,mub,nlooplog)
 
     return np.einsum('i,ij->j', Gamma_mub, Evo)
 
-def Gamma_tilde_Resum_Evo(Gamma_Init: np.array, mu:float, bT: float, bmax: float, gq: float, gg: float):
+def Gamma_tilde_Resum_Evo(Gamma_Init: np.array, mu:float, bT: float, bmax: float, gq: float, gg: float,nlooplog: int):
     
     bstar = bT / np.sqrt( 1 + bT**2/ (bmax**2) )
     
-    Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, mu, bstar)
+    Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, mu, bstar, nlooplog)
     
     Gamma_NonP = np.exp(-np.array([gq,gg]) * bT**2)
         
     return Gamma_Pert*Gamma_NonP
 
-def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float):
+def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     
+    hqhg = HqHg(Q,nlooplog)
     fqg=np.array([fq,fg])
+    fqg= fqg * hqhg
+    #print(fqg)
     epsilon = 10. ** (-8)
     bTlst = np.linspace(epsilon,10,2001)
     
-    gammalst = [np.dot(Gamma_tilde_Resum_Evo(Gamma_Init, Q, bT, bmax, gq, gg), fqg) for bT in bTlst]
+    gammalst = [np.dot(Gamma_tilde_Resum_Evo(Gamma_Init, Q, bT, bmax, gq, gg, nlooplog), fqg) for bT in bTlst]
     
     besselJ0lst = j0(theta*bTlst*Q)
     
@@ -335,9 +481,9 @@ def dEEC_NNLL_resum(z: float, mu: float, nloop_alphaS: int, nf: int):
     
     return zdsigma_dz_ee_NNLL_SU3_5flavor_num/z
 
-def Gamma_cal_plt(gammainit, Qlst):
+def Gamma_cal_plt(gammainit, Qlst, nlooplog):
     
-    GammaEvolst=np.array([Gamma_Evo(gammainit, Q)   for Q in Qlst])
+    GammaEvolst=np.array([Gamma_Evo(gammainit, Q, nlooplog)   for Q in Qlst])
     
     GammaEvolstq = GammaEvolst[:,0]
     GammaEvolstg = GammaEvolst[:,1]
@@ -354,12 +500,12 @@ def Gamma_cal_plt(gammainit, Qlst):
     plt.legend()
     plt.show()
 
-def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst):
+def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst,nlooplog):
     
     Gamma_tilde = []
     for bT in bTlst:
         for Q in Qlst:
-            f = Gamma_tilde_Perturbative_Evo(gammainit, Q, bT)
+            f = Gamma_tilde_Perturbative_Evo(gammainit, Q, bT,nlooplog)
             Gamma_tilde.append((bT, Q, f[0],f[1]))
             
     df = pd.DataFrame(Gamma_tilde, columns=["bT", "Q", "Gammatq", "Gammatg"])
@@ -391,12 +537,12 @@ def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst):
     plt.legend()
     plt.show()
 
-def Gamma_tilde_Resum_cal_plt(gammainit, Qlst, bTlst,bmax,gq,gg):
+def Gamma_tilde_Resum_cal_plt(gammainit, Qlst, bTlst,bmax,gq,gg,nlooplog):
     
     Gamma_tilde = []
     for bT in bTlst:
         for Q in Qlst:
-            f = Gamma_tilde_Resum_Evo(gammainit, Q, bT,bmax,gq,gg)
+            f = Gamma_tilde_Resum_Evo(gammainit, Q, bT,bmax,gq,gg,nlooplog)
             Gamma_tilde.append((bT, Q, f[0],f[1], bT* f[0], bT* f[1]))
             
     df = pd.DataFrame(Gamma_tilde, columns=["bT", "Q", "Gammatq", "Gammatg", "GammatqbT", "GammatgbT"])
@@ -441,14 +587,14 @@ def Gamma_tilde_Resum_cal_plt(gammainit, Qlst, bTlst,bmax,gq,gg):
     plt.legend()
     plt.show()
 
-def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg):
+def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     
     #'''
     EEC = []
     for theta in theta_lst:
         for Q in Q_lst:
             z= (1- np.cos(theta))/2
-            f = dEEC(theta, Q, gammainit, bmax, gq, gg, fq, fg)
+            f = dEEC(theta, Q, gammainit, bmax, gq, gg, fq, fg,nlooplog)
             fz = 2*theta/np.sin(theta)*f
             EEC.append((theta, Q, f,z,fz))
 
@@ -461,20 +607,21 @@ def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg):
     df_Q2 = df[df["Q"] == Q_lst[1]]
     df_Q3 = df[df["Q"] == Q_lst[2]]
 
-    plt.plot(df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEEC"], marker='o',label = f"Q={Q_lst[0]} GeV")
-    plt.plot(df_Q2["z"], 1/Q_lst[1]**2 *df_Q2["dEEC"], marker='s',label = f"Q={Q_lst[1]} GeV")
-    plt.plot(df_Q3["z"], 1/Q_lst[2]**2 *df_Q3["dEEC"], marker='^',label = f"Q={Q_lst[2]} GeV")
+    plt.plot(Q_lst[0]**2*df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEEC"], marker='o',label = f"Q={Q_lst[0]} GeV")
+    plt.plot(Q_lst[0]**2*df_Q2["z"], 1/Q_lst[1]**2 *df_Q2["dEEC"], marker='s',label = f"Q={Q_lst[1]} GeV")
+    plt.plot(Q_lst[0]**2*df_Q3["z"], 1/Q_lst[2]**2 *df_Q3["dEEC"], marker='^',label = f"Q={Q_lst[2]} GeV")
 
     #plt.xlim(0.002,50)
     
-    plt.xlabel(r"$z$")
+    plt.xlabel(r"$zQ^2$")
     plt.ylabel(r"$dEEC/(dzQ^2)$")
-    plt.title(r"$dEEC/(dzQ^2)$ vs $z$")
+    plt.title(r"$dEEC/(dzQ^2)$ vs $zQ^2$")
     plt.grid(True)
     plt.legend(fontsize=12,
         loc='upper right',
         handlelength=2)
     plt.xscale("log")
+    plt.yscale("log")
     plt.savefig("Output/dEECdzQ.pdf",bbox_inches='tight')
 
 def dEEC_cal_plt(zlst, Q_lst):
@@ -547,17 +694,17 @@ def dEEC_cal_plt(zlst, Q_lst):
     ax.plot(df4_Q3["z"],scales[2]* df4_Q3["dEEC"], linestyle='-', color=colors[2])
 
     # TMD
-    ax.plot(df_Resum_Q1["z"],scales[0]* df_Resum_Q1["dEECz"], marker='o', linestyle='', color=colors[0])
-    ax.plot(df_Resum_Q2["z"],scales[1]* df_Resum_Q2["dEECz"], marker='o', linestyle='', color=colors[1])
-    ax.plot(df_Resum_Q3["z"],scales[2]* df_Resum_Q3["dEECz"], marker='o', linestyle='', color=colors[2])
+    ax.plot(df_Resum_Q1["z"],scales[0]* df_Resum_Q1["dEECz"], marker='o', linestyle='', color=colors[0], markersize = 7, markerfacecolor='none')
+    ax.plot(df_Resum_Q2["z"],scales[1]* df_Resum_Q2["dEECz"], marker='o', linestyle='', color=colors[1], markersize = 7, markerfacecolor='none')
+    ax.plot(df_Resum_Q3["z"],scales[2]* df_Resum_Q3["dEECz"], marker='o', linestyle='', color=colors[2], markersize = 7, markerfacecolor='none')
 
 
     def grouplegend(colors, linesty, markersty):
         
         group = (
-        (Line2D([0], [0], color=colors[0], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[0], marker=markersty, linestyle='None', markersize=6)),
-        (Line2D([0], [0], color=colors[1], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[1], marker=markersty, linestyle='None', markersize=6)),
-        (Line2D([0], [0], color=colors[2], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[2], marker=markersty, linestyle='None', markersize=6))
+        (Line2D([0], [0], color=colors[0], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[0], marker=markersty, linestyle='None', markersize = 6, markerfacecolor='none')),
+        (Line2D([0], [0], color=colors[1], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[1], marker=markersty, linestyle='None', markersize = 6, markerfacecolor='none')),
+        (Line2D([0], [0], color=colors[2], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[2], marker=markersty, linestyle='None', markersize = 6, markerfacecolor='none'))
         )
         return group
     
@@ -597,16 +744,15 @@ def dEEC_cal_plt(zlst, Q_lst):
     
     ax.add_artist(leg1)
     
-    ax.set_xlabel("z")
-    ax.set_ylabel(r"$dEEC/dz$")
-    ax.set_title(r"$dEEC/dz$ vs z compared with the collinear ones")
+    ax.set_xlabel("z",fontsize=12)
+    ax.set_ylabel(r"$dEEC/dz$",fontsize=12)
+    ax.set_title(r"$dEEC/dz$ vs z compared with the collinear ones",fontsize=12)
     ax.grid(True)
     ax.set_xscale("log")
     ax.set_yscale("log")
     
     plt.savefig("Output/dEECcompare.pdf",bbox_inches='tight')
 
-    
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
@@ -636,22 +782,24 @@ if __name__ == '__main__':
     '''
     
     #'''
-    gammainit=np.array([0.7,0.7])
-    theta_lst = 2*np.exp(np.linspace(np.log(10**(-3)), np.log(0.8), 30))
-    Qlst = np.array([50.,100.,200.])
+    gammainit=np.array([0.754,0.824])
+    theta_lst = 2*np.exp(np.linspace(np.log(10**(-3)), np.log(0.7), 30))
+    Qlst = np.array([20.,50.,100.])
 
+    
     bmax = 1.5
-    gq = 0.5
-    gg = 0.5
+    gq = 0.35
+    gg = 0.35
     fq = 1
     fg = 0
-    dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg)
+    #nlooplog=1
+    dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg,1)
     #'''
-
+    
     
     #'''
     zlst = np.exp(np.linspace(np.log(10**(-6)), np.log(0.5), 40))
-    Qlst = np.array([50.,100.,200.])
+    #Qlst = np.array([50.,100.,200.])
     dEEC_cal_plt(zlst,Qlst)
     #'''
  

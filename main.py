@@ -720,14 +720,14 @@ def dEEC_cal_plt(zlst, Q_lst):
                             facecolor=facecolor, edgecolor=edgecolor, label=label)
         
     square_handles  = [
-    SmallSquare(facecolor=colors[0], edgecolor='white', label=f'Q = {Q_lst[0]} GeV'+rf'$(\times {scales[0]})$',size=4),
-    SmallSquare(facecolor=colors[1], edgecolor='white', label=f'Q = {Q_lst[1]} GeV',size=4),
-    SmallSquare(facecolor=colors[2], edgecolor='white', label=f'Q = {Q_lst[2]} GeV'+rf'$(\times {scales[2]})$',size=4),
+    SmallSquare(facecolor=colors[0], edgecolor='white', label=fr'$\bar E$ = {Q_lst[0]} GeV'+rf'$(\times {scales[0]})$',size=4),
+    SmallSquare(facecolor=colors[1], edgecolor='white', label=fr'$\bar E$ = {Q_lst[1]} GeV',size=4),
+    SmallSquare(facecolor=colors[2], edgecolor='white', label=fr'$\bar E$ = {Q_lst[2]} GeV'+rf'$(\times {scales[2]})$',size=4),
     ]
     
     leg1 = ax.legend(
         handles=square_handles,
-        fontsize=10,
+        fontsize=11,
         loc='lower left',   
         frameon=True,
         handlelength=1.5
@@ -744,9 +744,9 @@ def dEEC_cal_plt(zlst, Q_lst):
     
     ax.add_artist(leg1)
     
-    ax.set_xlabel("z",fontsize=12)
-    ax.set_ylabel(r"$dEEC/dz$",fontsize=12)
-    ax.set_title(r"$dEEC/dz$ vs z compared with the collinear ones",fontsize=12)
+    ax.set_xlabel("z",fontsize=13)
+    ax.set_ylabel(r"$dEEC/dz$",fontsize=13)
+    ax.set_title(r"$dEEC/dz$ vs z compared with the collinear ones",fontsize=14)
     ax.grid(True)
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -784,7 +784,7 @@ if __name__ == '__main__':
     #'''
     gammainit=np.array([0.754,0.824])
     theta_lst = 2*np.exp(np.linspace(np.log(10**(-3)), np.log(0.7), 30))
-    Qlst = np.array([20.,50.,100.])
+    Qlst = np.array([10.,20.,50.])
 
     
     bmax = 1.5

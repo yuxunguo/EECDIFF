@@ -308,6 +308,15 @@ def adimsum(AS: float, nloop: int, nf: int):
     
     return np.einsum('n,nml->ml', aslst[:nloop], adimlst[:nloop])
 
+def tot_xsec_sum(Q: float, nloop: int,  nf: int = 5):
+    AS = AlphaS(3,5,Q)
+    sigma = 4 * np.pi * AS**2/(3*Q**2)
+    ASpi = AS/(2*np.pi)
+    ASlst = [1,ASpi,ASpi**2]
+    Coef = [1, -3/2*CF, 
+            (3/2*CF)**2 - CF*( (123/8-11*zeta(3)) * CA - 3/8 * CF -(11/2-4*zeta(3))*nf/2)]
+    return np.sum(ASlst[:nloop+1]*Coef[:nloop+1])
+
 def betaLO(nf: int):
     ca=CA
     return 11/3*ca-2/3*nf
@@ -608,20 +617,20 @@ def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     df_Q3 = df[df["Q"] == Q_lst[2]]
 
     plt.plot(Q_lst[0]**2*df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEEC"], marker='o',label = f"Q={Q_lst[0]} GeV")
-    plt.plot(Q_lst[0]**2*df_Q2["z"], 1/Q_lst[1]**2 *df_Q2["dEEC"], marker='s',label = f"Q={Q_lst[1]} GeV")
-    plt.plot(Q_lst[0]**2*df_Q3["z"], 1/Q_lst[2]**2 *df_Q3["dEEC"], marker='^',label = f"Q={Q_lst[2]} GeV")
+    plt.plot(Q_lst[1]**2*df_Q2["z"], 1/Q_lst[1]**2 * df_Q2["dEEC"], marker='s',label = f"Q={Q_lst[1]} GeV")
+    plt.plot(Q_lst[2]**2*df_Q3["z"], 1/Q_lst[2]**2 * df_Q3["dEEC"], marker='^',label = f"Q={Q_lst[2]} GeV")
 
     #plt.xlim(0.002,50)
     
-    plt.xlabel(r"$zQ^2$")
-    plt.ylabel(r"$dEEC/(dzQ^2)$")
-    plt.title(r"$dEEC/(dzQ^2)$ vs $zQ^2$")
+    plt.xlabel(r"$z\bar{E}^2$")
+    plt.ylabel(r"$dEEC/(dz\bar{E}^2)$")
+    plt.title(r"$dEEC/(dz\bar{E}^2)$ vs $z\bar{E}^2$")
     plt.grid(True)
     plt.legend(fontsize=12,
         loc='upper right',
         handlelength=2)
     plt.xscale("log")
-    plt.yscale("log")
+    #plt.yscale("log")
     plt.savefig("Output/dEECdzQ.pdf",bbox_inches='tight')
 
 def dEEC_cal_plt(zlst, Q_lst):
@@ -783,8 +792,8 @@ if __name__ == '__main__':
     
     #'''
     gammainit=np.array([0.754,0.824])
-    theta_lst = 2*np.exp(np.linspace(np.log(10**(-3)), np.log(0.7), 30))
-    Qlst = np.array([10.,20.,50.])
+    theta_lst = 2*np.exp(np.linspace(np.log(10**(-4)), np.log(0.7), 30))
+    Qlst = np.array([50.,100.,200.])
 
     
     bmax = 1.5
@@ -798,7 +807,7 @@ if __name__ == '__main__':
     
     
     #'''
-    zlst = np.exp(np.linspace(np.log(10**(-6)), np.log(0.5), 40))
+    zlst = np.exp(np.linspace(np.log(10**(-8)), np.log(0.5), 40))
     #Qlst = np.array([50.,100.,200.])
     dEEC_cal_plt(zlst,Qlst)
     #'''

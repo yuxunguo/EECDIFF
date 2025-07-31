@@ -1,0 +1,37 @@
+#: table_doi: 10.17182/hepdata.23586.v1/t1
+#: name: Table 1
+#: description: VALUES FOR THE ASSYMETRY ARE GIVEN ALSO.
+#: data_file: Table1.yaml
+#: keyword reactions: E+ E- --> HADRONS
+#: keyword observables: CORR | DSIGMA/DCHI
+#: keyword phrases: Exclusive | Single Differential Cross Section | E+ E- Scattering
+#: keyword cmenergies: 29.0
+#: RE,E+ E- --> HADRONS
+#: SQRT(S) [GeV],29.0,,
+#: SYS,SYSTEMATIC ERRORS ARE LARGER THAT STATISTICAL AND ARE INCLUDED IN THE ERRORS GIVEN IN THE TABLES
+CHI [DEGREES],DSIGMA/DCHI [MRAD**-1],error +,error -
+1.8,1624.0,305.0,-305.0
+5.4,430.0,21.0,-21.0
+9.0,580.0,25.0,-25.0
+12.6,589.0,19.0,-19.0
+16.2,560.0,13.0,-13.0
+19.8,493.0,10.0,-10.0
+23.4,424.0,10.0,-10.0
+27.0,360.0,10.0,-10.0
+30.6,306.0,12.0,-12.0
+34.2,267.0,8.0,-8.0
+37.8,241.0,5.0,-5.0
+41.4,217.0,5.0,-5.0
+45.0,197.0,6.0,-6.0
+48.6,180.0,6.0,-6.0
+52.2,167.0,5.0,-5.0
+55.8,155.0,4.0,-4.0
+59.4,148.0,3.0,-3.0
+63.0,139.0,4.0,-4.0
+66.6,134.0,3.0,-3.0
+70.2,129.0,4.0,-4.0
+73.8,127.0,4.0,-4.0
+77.4,125.0,3.0,-3.0
+81.0,122.0,4.0,-4.0
+84.6,122.0,3.0,-3.0
+88.2,122.0,3.0,-3.0

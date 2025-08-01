@@ -312,9 +312,9 @@ def tot_xsec_sum(Q: float, nloop: int,  nf: int = 5):
     AS = AlphaS(3,5,Q)
     sigma = 4 * np.pi * AS**2/(3*Q**2)
     ASpi = AS/(2*np.pi)
-    ASlst = [1,ASpi,ASpi**2]
-    Coef = [1, -3/2*CF, 
-            (3/2*CF)**2 - CF*( (123/8-11*zeta(3)) * CA - 3/8 * CF -(11/2-4*zeta(3))*nf/2)]
+    ASlst = np.array([1,ASpi,ASpi**2])
+    Coef = np.array([1, -3/2*CF, 
+            (3/2*CF)**2 - CF*( (123/8-11*zeta(3)) * CA - 3/8 * CF -(11/2-4*zeta(3))*nf/2)])
     return np.sum(ASlst[:nloop+1]*Coef[:nloop+1])
 
 def betaLO(nf: int):

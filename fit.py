@@ -1,7 +1,7 @@
 from dEECtheo import dEEC, tot_xsec_sum
 import numpy as np 
 import pandas as pd
-import iminuit as Minuit
+from iminuit import Minuit
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import os 
@@ -18,6 +18,18 @@ EECRawdataTOPAZ2 = pd.read_csv("ee_EEC_data/Raw Data/TOPAZ/Table2.csv", comment=
 EECRawdataMAC['f'] = EECRawdataMAC['f']/1000
 EECRawdataMAC['delta f plus'] = EECRawdataMAC['delta f plus']/1000
 EECRawdataMAC['delta f minus'] = EECRawdataMAC['delta f minus']/1000
+
+EECRawdataTASSO1['f'] = EECRawdataTASSO1['f'] * np.sin(EECRawdataTASSO1['theta']*np.pi/180)
+EECRawdataTASSO1['delta f plus'] = EECRawdataTASSO1['delta f plus'] * np.sin(EECRawdataTASSO1['theta']*np.pi/180)
+EECRawdataTASSO1['delta f minus'] = EECRawdataTASSO1['delta f minus'] * np.sin(EECRawdataTASSO1['theta']*np.pi/180)
+
+EECRawdataTASSO2['f'] = EECRawdataTASSO2['f'] * np.sin(EECRawdataTASSO2['theta']*np.pi/180)
+EECRawdataTASSO2['delta f plus'] = EECRawdataTASSO2['delta f plus'] * np.sin(EECRawdataTASSO2['theta']*np.pi/180)
+EECRawdataTASSO2['delta f minus'] = EECRawdataTASSO2['delta f minus'] * np.sin(EECRawdataTASSO2['theta']*np.pi/180)
+
+EECRawdataTASSO3['f'] = EECRawdataTASSO3['f'] * np.sin(EECRawdataTASSO3['theta']*np.pi/180)
+EECRawdataTASSO3['delta f plus'] = EECRawdataTASSO3['delta f plus'] * np.sin(EECRawdataTASSO3['theta']*np.pi/180)
+EECRawdataTASSO3['delta f minus'] = EECRawdataTASSO3['delta f minus'] * np.sin(EECRawdataTASSO3['theta']*np.pi/180)
 
 EECRawdataTOPAZ1['delta f sys plus'] = EECRawdataTOPAZ1["f"].to_numpy()*np.array(pd.to_numeric(EECRawdataTOPAZ1['delta f sys plus'].str.rstrip('%'), errors='coerce') / 100)
 EECRawdataTOPAZ1['delta f sys minus'] = EECRawdataTOPAZ1["f"].to_numpy()*np.array(pd.to_numeric(EECRawdataTOPAZ1['delta f sys minus'].str.rstrip('%'), errors='coerce') / 100)
@@ -69,23 +81,29 @@ EEC_merged = pd.concat(frames, ignore_index=True)
 EEC_merged['theta'] = EEC_merged['theta']/180*np.pi
 EEC_merged['z'] = (1-np.cos(EEC_merged['theta'] ))/2
 
-EECdata = EEC_merged[EEC_merged['z']<0.1]
+EECdata = EEC_merged[EEC_merged['z']<0.1].copy()
+
+EECdata.loc[:,"f raw"]=EECdata["f"]
+EECdata.loc[:,"delta f raw"]=EECdata["delta f"]
+EECdata["f"] = EECdata["f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
+EECdata["delta f"] = EECdata["delta f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
+
+EECdata["fz"] = 2/np.sin(EECdata["theta"]) * EECdata["f"]
+EECdata["delta fz"] = 2/np.sin(EECdata["theta"]) * EECdata["delta f"]
 
 Export_Mode = 0
 
 def compute_EEC(theta, Q, EoverQ, gamma_init, bmax, gq, gg, fq, fg, nloop_log):
     z = (1 - np.cos(theta)) / 2
-    f = dEEC(theta, EoverQ * Q, gamma_init, bmax, gq, gg, fq, fg, nloop_log)
-    dEECz = 2 * theta / np.sin(theta) * f
+    f = theta * dEEC(theta, EoverQ * Q, gamma_init, bmax, gq, gg, fq, fg, nloop_log)
+    dEECz = 2 / np.sin(theta) * f
     return (theta, Q, f, z, dEECz)
 
 def cost_EEC(EoverQ: float, Gammaq: float, Gammag: float, bmax: float,
-             gq: float, gg: float, fq: float, fg: float) -> float:
+             gq: float, gg: float, fq: float, fg: float, norm: float) -> float:
     """Compute the chi-squared cost function for EEC data."""
     gamma_init = np.array([Gammaq, Gammag])
     nloop_log = 1
-    
-    
     
     tasks = [
         (theta, Q, EoverQ, gamma_init, bmax, gq, gg, fq, fg, nloop_log)
@@ -98,61 +116,84 @@ def cost_EEC(EoverQ: float, Gammaq: float, Gammag: float, bmax: float,
     
     EECdataFit = EECdata.copy()
     # Match predictions to EECdata and compute chi-squared
-    EECdataFit['pred'] = pred_df['dEEC'].values
+    EECdataFit['pred'] = norm*pred_df['dEEC'].values
+    EECdataFit['predz'] = norm*pred_df['dEECz'].values
     EECdataFit['cost'] = ((EECdataFit['pred'] - EECdataFit['f']) / EECdataFit['delta f'])**2
     
     if(Export_Mode == 1):
+        EECdataFit.to_csv('Output/Results.csv')
         return EECdataFit
     
     return EECdataFit['cost'].sum()
 
-def plot_EEC_by_theta(EECdata):
-    plt.figure(figsize=(8, 5))
-
+def plot_EEC_by_theta(PlotDF):
     # Sort by theta for smooth curves
-    EECdata = EECdata.sort_values(by='theta')
+    PlotDF = PlotDF.sort_values(by='theta')
 
-    # Plot each Q group
-    for Qval, group in EECdata.groupby('Q'):
-        plt.errorbar(group['theta'], group['f'], yerr=group['delta f'],
-                     fmt='o', capsize=3, markersize=4, label=f"Data (Q={Qval})", alpha=0.6)
+    # Group by Q values
+    groups = list(PlotDF.groupby('Q'))
+    n_plots = len(groups)
+    ncols = 4
+    nrows = 2
+    n_per_figure = nrows * ncols
 
-        plt.plot(group['theta'], group['pred'], label=f"Model (Q={Qval})", lw=2)
+    for fig_idx in range(0, n_plots, n_per_figure):
+        fig, axes = plt.subplots(nrows, ncols, figsize=(24, 12))
+        axes = axes.flatten()  # flatten in case we don’t fill all 8 subplots
 
-    plt.xlabel(r"$\theta$")
-    plt.ylabel("EEC")
-    plt.title("EEC vs $\\theta$, by $Q$")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+        for ax_idx, (Qval, group) in enumerate(groups[fig_idx:fig_idx+n_per_figure]):
+            ax = axes[ax_idx]
+
+            ax.errorbar(group['z'], group['fz'], yerr=group['delta fz'],
+                        fmt='o', capsize=3, markersize=4, label="Data", alpha=0.6)
+            ax.plot(group['z'], group['predz'], label="Model", lw=2)
+
+            ax.set_title(f"Q = {Qval}")
+            ax.set_xlabel(r"$z$")
+            ax.set_ylabel("dEEC/dz")
+            ax.set_yscale("log")
+            ax.set_xscale("log")
+            ax.legend()
+            ax.grid(True)
+
+        # Hide any unused subplots
+        for j in range(ax_idx + 1, len(axes)):
+            axes[j].axis('off')
+
+        plt.tight_layout()
+        plt.savefig("Output/myplot.pdf", dpi=300, bbox_inches='tight')
 
 if __name__ == '__main__':
     pool = Pool()
     init_params = {
-        "EoverQ": 0.5,
+        "EoverQ": 0.12,
         "Gammaq": 0.754,
         "Gammag": 0.824,
         "bmax": 1.5,
         "gq": 0.35,
         "gg": 0.35,
         "fq": 1,
-        "fg": 0
+        "fg": 0,
+        "norm": 1.35,
     }
     Export_Mode = 1
-    #print(EECdata)
     TestDF = cost_EEC(**init_params)
     plot_EEC_by_theta(TestDF)
-    #print()
-    
-    ''' 
-    fixed_params = ["Gammaq", "Gammag","bmax","gq","gg","fq","fg"] 
 
+    fixed_params = ["Gammaq", "Gammag","bmax",
+                    #"gq","gg",
+                    "fq","fg",
+                    #"norm"
+                    ] 
+    '''
     m = Minuit(cost_EEC, **init_params)
 
     for name in fixed_params:
         m.fixed[name] = True
-        
+    
+    m.limits['gq'] = (0,3)
+    m.limits['gg'] = (0,3)
+    m.limits['norm'] = (0,5)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
@@ -163,6 +204,11 @@ if __name__ == '__main__':
         print(*m.values, sep=", ", file = f)
         print(*m.errors, sep=", ", file = f)
         print(m.params, file = f)
+        
+    best_fit_params = m.values.to_dict()
+    
+    Export_Mode = 1
+
+    TestDF = cost_EEC(**best_fit_params)
+    plot_EEC_by_theta(TestDF)
     '''
-    
-    

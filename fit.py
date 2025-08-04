@@ -130,7 +130,7 @@ if __name__ == '__main__':
     m.limits['gq'] = (0,3)
     m.limits['gg'] = (0,3)
     m.limits['norm'] = (0,5)
-    m.limits['muOverE'] = (0.1,10)
+    m.limits['muOverE'] = (0.01,10)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties

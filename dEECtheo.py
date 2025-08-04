@@ -405,7 +405,7 @@ def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.array, mu:float, bT: float, nloo
 
     return np.einsum('i,ij->j', Gamma_mub, Evo)
 
-BMAX_INTEGRAL = 10
+BMAX_INTEGRAL = 20
 
 def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     

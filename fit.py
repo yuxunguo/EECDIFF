@@ -104,13 +104,14 @@ if __name__ == '__main__':
         "gg": 0.042,
         "fq": 1,
         "fg": 0,
-        "norm": 0.8*0.346,
+        "norm": 0.6*0.346,
     }
 
     '''
     Export_Mode = 1
     TestDF = cost_EEC(**init_params)
     plot_EEC_by_theta(TestDF)
+    print(TestDF['cost'].sum()/len(TestDF))
     '''
     fixed_params = ["Gammaq", "Gammag","bmax",
                     #"gq",

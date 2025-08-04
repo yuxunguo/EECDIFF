@@ -12,6 +12,7 @@ from matplotlib.patches import Patch,Rectangle
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from functools import cache 
+from scipy.integrate import quad
 
 NC = 3
 CF = (NC**2 - 1) / (2 * NC)
@@ -404,57 +405,26 @@ def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.array, mu:float, bT: float, nloo
 
     return np.einsum('i,ij->j', Gamma_mub, Evo)
 
-def cache_wrapper(func):
-    cache = {}
-
-    def wrapped(Gamma_Init, mu, bT, bmax, gq, gg, nlooplog):
-        key = (tuple(Gamma_Init.flatten()), mu, bT, bmax, gq, gg, nlooplog)
-        if key not in cache:
-            cache[key] = func(Gamma_Init, mu, bT, bmax, gq, gg, nlooplog)
-        return cache[key]
-
-    return wrapped
-
-@cache_wrapper
-def Gamma_tilde_Resum_Evo(Gamma_Init: np.array, mu:float, bT: float, bmax: float, gq: float, gg: float,nlooplog: int):
-    
-    bstar = bT / np.sqrt( 1 + bT**2/ (bmax**2) )
-    
-    Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, mu, bstar, nlooplog)
-    
-    Gamma_NonP = np.exp(-np.array([gq,gg]) * bT**2)
-
-    return Gamma_Pert*Gamma_NonP
+BMAX_INTEGRAL = 10
 
 def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     
     hqhg = HqHg(Q,nlooplog)
     fqg=np.array([fq,fg])
     fqg= fqg * hqhg
-    #print(fqg)
-    epsilon = 10. ** (-8)
-    bTlst = np.linspace(epsilon,10,2001)
     
-    gammalst = [np.dot(Gamma_tilde_Resum_Evo(Gamma_Init, Q, bT, bmax, gq, gg, nlooplog), fqg) for bT in bTlst]
+    def integrand(bT):
+        bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
+        Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
+        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+        Gamma = Gamma_Pert * Gamma_NonP
+        gamma_dot = np.dot(Gamma, fqg)
+        return bT * j0(theta * bT * Q) * gamma_dot
+
+    integral, error = quad(integrand, 0, BMAX_INTEGRAL, epsabs=1e-6, epsrel=1e-6, limit=200)
+    result = integral * Q**2
     
-    besselJ0lst = j0(theta*bTlst*Q)
-    
-    ylst = bTlst * besselJ0lst * gammalst
-    
-    integral = simps(ylst, bTlst) * Q ** 2
-    
-    '''
-    plt.plot(bTlst, bTlst*gammalst, marker='o',label = f"Q=20 GeV")
-    
-    plt.xlabel("bT (GeV$^{-1}$)")
-    plt.ylabel("dEEC")
-    plt.title("dEEC vs bT")
-    plt.grid(True)
-    plt.legend()
-    plt.yscale("log")
-    plt.show()
-    '''
-    return integral #* 4 * (np.pi) **2 
+    return result
 
 def dEEC_fixed_order(z: float, mu: float, nloop_alphaS: int, nf: int, nloopEEC: int):
     AS = AlphaS(nloop_alphaS, nf, mu)/(4*np.pi)
@@ -550,56 +520,6 @@ def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst,nlooplog):
     plt.plot(df_Q4["bT"], df_Q4["Gammatg"], marker='*',color='blue',label = f"Q={Qlst[3]} GeV")
     plt.plot(df_Q5["bT"], df_Q5["Gammatg"], marker='+',color='blue',label = f"Q={Qlst[4]} GeV")
     
-    
-    plt.xlabel(r"bT (GeV$^-1$)")
-    plt.ylabel(r"$\tilde{\Gamma}_i$")
-    plt.grid(True)
-    plt.yscale("log")
-    plt.legend()
-    plt.show()
-
-def Gamma_tilde_Resum_cal_plt(gammainit, Qlst, bTlst,bmax,gq,gg,nlooplog):
-    
-    Gamma_tilde = []
-    for bT in bTlst:
-        for Q in Qlst:
-            f = Gamma_tilde_Resum_Evo(gammainit, Q, bT,bmax,gq,gg,nlooplog)
-            Gamma_tilde.append((bT, Q, f[0],f[1], bT* f[0], bT* f[1]))
-            
-    df = pd.DataFrame(Gamma_tilde, columns=["bT", "Q", "Gammatq", "Gammatg", "GammatqbT", "GammatgbT"])
-    
-    df_Q1 = df[df["Q"] == Qlst[0]]
-    df_Q2 = df[df["Q"] == Qlst[1]]
-    df_Q3 = df[df["Q"] == Qlst[2]]
-    df_Q4 = df[df["Q"] == Qlst[3]]
-    df_Q5 = df[df["Q"] == Qlst[4]]
-    '''
-    plt.plot(df_Q1["bT"], df_Q1["Gammatq"], marker='o',color='red',label = f"Q={Qlst[0]} GeV")
-    plt.plot(df_Q2["bT"], df_Q2["Gammatq"], marker='s',color='red',label = f"Q={Qlst[1]} GeV")
-    plt.plot(df_Q3["bT"], df_Q3["Gammatq"], marker='^',color='red',label = f"Q={Qlst[2]} GeV")
-    plt.plot(df_Q4["bT"], df_Q4["Gammatq"], marker='*',color='red',label = f"Q={Qlst[3]} GeV")
-    plt.plot(df_Q5["bT"], df_Q5["Gammatq"], marker='+',color='red',label = f"Q={Qlst[4]} GeV")
-    
-    
-    plt.plot(df_Q1["bT"], df_Q1["Gammatg"], marker='o',color='blue',label = f"Q={Qlst[0]} GeV")
-    plt.plot(df_Q2["bT"], df_Q2["Gammatg"], marker='s',color='blue',label = f"Q={Qlst[1]} GeV")
-    plt.plot(df_Q3["bT"], df_Q3["Gammatg"], marker='^',color='blue',label = f"Q={Qlst[2]} GeV")
-    plt.plot(df_Q4["bT"], df_Q4["Gammatg"], marker='*',color='blue',label = f"Q={Qlst[3]} GeV")
-    plt.plot(df_Q5["bT"], df_Q5["Gammatg"], marker='+',color='blue',label = f"Q={Qlst[4]} GeV")
-    '''
-    
-    plt.plot(df_Q1["bT"], df_Q1["GammatqbT"], marker='o',color='red',label = f"Q={Qlst[0]} GeV")
-    plt.plot(df_Q2["bT"], df_Q2["GammatqbT"], marker='s',color='red',label = f"Q={Qlst[1]} GeV")
-    plt.plot(df_Q3["bT"], df_Q3["GammatqbT"], marker='^',color='red',label = f"Q={Qlst[2]} GeV")
-    plt.plot(df_Q4["bT"], df_Q4["GammatqbT"], marker='*',color='red',label = f"Q={Qlst[3]} GeV")
-    plt.plot(df_Q5["bT"], df_Q5["GammatqbT"], marker='+',color='red',label = f"Q={Qlst[4]} GeV")
-    
-    
-    plt.plot(df_Q1["bT"], df_Q1["GammatgbT"], marker='o',color='blue',label = f"Q={Qlst[0]} GeV")
-    plt.plot(df_Q2["bT"], df_Q2["GammatgbT"], marker='s',color='blue',label = f"Q={Qlst[1]} GeV")
-    plt.plot(df_Q3["bT"], df_Q3["GammatgbT"], marker='^',color='blue',label = f"Q={Qlst[2]} GeV")
-    plt.plot(df_Q4["bT"], df_Q4["GammatgbT"], marker='*',color='blue',label = f"Q={Qlst[3]} GeV")
-    plt.plot(df_Q5["bT"], df_Q5["GammatgbT"], marker='+',color='blue',label = f"Q={Qlst[4]} GeV")
     
     plt.xlabel(r"bT (GeV$^-1$)")
     plt.ylabel(r"$\tilde{\Gamma}_i$")
@@ -790,18 +710,6 @@ if __name__ == '__main__':
     bTlst = np.linspace(10. ** (-6),2,20)
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
-    # Test of Gamma_tilde_Resum_Evo(mu,bT)
-    #'''
-    gammainit = np.array([0.7,0.7])
-    Qlst = np.linspace(20, 100, 5)
-    epsilon = 10 ** (-8)
-    bTlst = np.linspace(epsilon,10,2001)
-    
-    bmax = 1.5
-    gq = 0.5    
-    gg = 0.5
-    Gamma_tilde_Resum_cal_plt(gammainit,Qlst,bTlst,bmax,gq,gg,nlooplog=1 )
-    #'''
     
     '''
     gammainit=np.array([0.754,0.824])

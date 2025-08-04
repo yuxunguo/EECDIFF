@@ -7,19 +7,19 @@ import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import os, time
 
-'''
-EECdata = EEC_merged[EEC_merged['z']<0.1].copy()
+EECdata1 = EEC_merged[(EEC_merged['z']<0.2) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
 
-EECdata.loc[:,"f raw"]=EECdata["f"]
-EECdata.loc[:,"delta f raw"]=EECdata["delta f"]
-EECdata["f"] = EECdata["f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
-EECdata["delta f"] = EECdata["delta f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
+EECdata1.loc[:,"f raw"]=EECdata1["f"]
+EECdata1.loc[:,"delta f raw"]=EECdata1["delta f"]
+EECdata1["f"] = EECdata1["f raw"] / EECdata1["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
+EECdata1["delta f"] = EECdata1["delta f raw"] / EECdata1["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
 
-EECdata["fz"] = 2/np.sin(EECdata["theta"]) * EECdata["f"]
-EECdata["delta fz"] = 2/np.sin(EECdata["theta"]) * EECdata["delta f"]
-'''
-    
-EECdata = EEC_Simulate[EEC_Simulate['theta']<0.3].copy().reset_index(drop=True)
+EECdata1["fz"] = 2/np.sin(EECdata1["theta"]) * EECdata1["f"]
+EECdata1["delta fz"] = 2/np.sin(EECdata1["theta"]) * EECdata1["delta f"]
+
+EECdata2 = EEC_Simulate[EEC_Simulate['theta']<0.3].copy().reset_index(drop=True)
+
+EECdata = EECdata2
 
 Export_Mode = 0
 
@@ -74,13 +74,13 @@ def plot_EEC_by_theta(PlotDF):
         for ax_idx, (Qval, group) in enumerate(groups[fig_idx:fig_idx+n_per_figure]):
             ax = axes[ax_idx]
 
-            ax.errorbar(group['z'] * Qval **2 , group['fz'], yerr=group['delta fz'],
+            ax.errorbar(group['theta'], 1/group['theta']*group['f'], yerr=1/group['theta']*group['delta f'],
                         fmt='o', capsize=3, markersize=4, label="Data", alpha=0.6)
-            ax.plot(group['z']* Qval **2 , group['predz'], label="Model", lw=2)
+            ax.plot(group['theta']  , 1/group['theta']*group['pred'], label="Model", lw=2)
 
             ax.set_title(f"Q = {Qval}")
-            ax.set_xlabel(r"$z$")
-            ax.set_ylabel("dEEC/dz")
+            ax.set_xlabel(r"$theta$")
+            ax.set_ylabel("dEEC/dtheta")
             ax.set_yscale("log")
             ax.set_xscale("log")
             ax.legend()
@@ -149,7 +149,7 @@ if __name__ == '__main__':
     best_fit_params = m.values.to_dict()
     
     Export_Mode = 1
-
+    EECdata = EECdata1
     TestDF = cost_EEC(**best_fit_params)
     plot_EEC_by_theta(TestDF)
     #'''

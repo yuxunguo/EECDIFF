@@ -11,7 +11,7 @@ from matplotlib.text import Text
 from matplotlib.patches import Patch,Rectangle
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from functools import cache 
+from functools import cache, lru_cache
 from scipy.integrate import quad
 
 NC = 3
@@ -395,17 +395,21 @@ def Gamma_Evo(Gamma_Init: np.array, mu: float, nlooplog: int):
     
     return Gamma_mu
 
-def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.array, mu:float, bT: float, nlooplog):
+@lru_cache(maxsize=None)
+def _Gamma_tilde_Pert_Evo(mu: float, bT: float, nlooplog: int, Gamma_Init_tuple: tuple):
     
-    mub = 2 * np.exp(-np.euler_gamma) /bT
-    Gamma_mub = Gamma_Evo(Gamma_Init, mub,nlooplog)
-
+    Gamma_Init = np.array(Gamma_Init_tuple)
+    mub = 2 * np.exp(-np.euler_gamma) / bT
+    Gamma_mub = Gamma_Evo(Gamma_Init, mub, nlooplog)
     Evo = evolop(J, NF, P, mu, mub, nloop)
     #Evo = evolop_adapt(mu,mub,nlooplog)
-
+    
     return np.einsum('i,ij->j', Gamma_mub, Evo)
 
-BMAX_INTEGRAL = 20
+def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.ndarray, mu: float, bT: float, nlooplog: int):
+    return _Gamma_tilde_Pert_Evo(mu, bT, nlooplog, tuple(Gamma_Init))
+
+BMAX_INTEGRAL = 30
 
 def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     

@@ -1,6 +1,5 @@
 import numpy as np 
 import pandas as pd
-
 EECRawdataMAC = pd.read_csv("ee_EEC_data/Raw Data/MAC/Table1.csv", comment="#", header=0, names = ["theta","f","delta f plus","delta f minus"])
 EECRawdataMARKII = pd.read_csv("ee_EEC_data/Raw Data/MARKII/Table5.csv", comment="#", header=0, names = ["theta","theta minus", "theta plus","f","delta f stat plus","delta f stat minus", "delta f sys plus","delta f sys minus"])
 EECRawdataOPAL = pd.read_csv("ee_EEC_data/Raw Data/OPAL/Table2.csv", comment="#", header=0, names = ["theta","theta minus", "theta plus","f","delta f plus","delta f minus"])
@@ -13,6 +12,18 @@ EECRawdataTOPAZ2 = pd.read_csv("ee_EEC_data/Raw Data/TOPAZ/Table2.csv", comment=
 EECRawdataMAC['f'] = EECRawdataMAC['f']/1000
 EECRawdataMAC['delta f plus'] = EECRawdataMAC['delta f plus']/1000
 EECRawdataMAC['delta f minus'] = EECRawdataMAC['delta f minus']/1000
+
+EECRawdataTASSO1['f'] = EECRawdataTASSO1['f'] * np.sin(EECRawdataTASSO1['theta']*np.pi/180)
+EECRawdataTASSO1['delta f plus'] = EECRawdataTASSO1['delta f plus'] * np.sin(EECRawdataTASSO1['theta']*np.pi/180)
+EECRawdataTASSO1['delta f minus'] = EECRawdataTASSO1['delta f minus'] * np.sin(EECRawdataTASSO1['theta']*np.pi/180)
+
+EECRawdataTASSO2['f'] = EECRawdataTASSO2['f'] * np.sin(EECRawdataTASSO2['theta']*np.pi/180)
+EECRawdataTASSO2['delta f plus'] = EECRawdataTASSO2['delta f plus'] * np.sin(EECRawdataTASSO2['theta']*np.pi/180)
+EECRawdataTASSO2['delta f minus'] = EECRawdataTASSO2['delta f minus'] * np.sin(EECRawdataTASSO2['theta']*np.pi/180)
+
+EECRawdataTASSO3['f'] = EECRawdataTASSO3['f'] * np.sin(EECRawdataTASSO3['theta']*np.pi/180)
+EECRawdataTASSO3['delta f plus'] = EECRawdataTASSO3['delta f plus'] * np.sin(EECRawdataTASSO3['theta']*np.pi/180)
+EECRawdataTASSO3['delta f minus'] = EECRawdataTASSO3['delta f minus'] * np.sin(EECRawdataTASSO3['theta']*np.pi/180)
 
 EECRawdataTOPAZ1['delta f sys plus'] = EECRawdataTOPAZ1["f"].to_numpy()*np.array(pd.to_numeric(EECRawdataTOPAZ1['delta f sys plus'].str.rstrip('%'), errors='coerce') / 100)
 EECRawdataTOPAZ1['delta f sys minus'] = EECRawdataTOPAZ1["f"].to_numpy()*np.array(pd.to_numeric(EECRawdataTOPAZ1['delta f sys minus'].str.rstrip('%'), errors='coerce') / 100)

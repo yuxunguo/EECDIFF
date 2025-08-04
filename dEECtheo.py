@@ -404,6 +404,18 @@ def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.array, mu:float, bT: float, nloo
 
     return np.einsum('i,ij->j', Gamma_mub, Evo)
 
+def cache_wrapper(func):
+    cache = {}
+
+    def wrapped(Gamma_Init, mu, bT, bmax, gq, gg, nlooplog):
+        key = (tuple(Gamma_Init.flatten()), mu, bT, bmax, gq, gg, nlooplog)
+        if key not in cache:
+            cache[key] = func(Gamma_Init, mu, bT, bmax, gq, gg, nlooplog)
+        return cache[key]
+
+    return wrapped
+
+@cache_wrapper
 def Gamma_tilde_Resum_Evo(Gamma_Init: np.array, mu:float, bT: float, bmax: float, gq: float, gg: float,nlooplog: int):
     
     bstar = bT / np.sqrt( 1 + bT**2/ (bmax**2) )
@@ -411,7 +423,7 @@ def Gamma_tilde_Resum_Evo(Gamma_Init: np.array, mu:float, bT: float, bmax: float
     Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, mu, bstar, nlooplog)
     
     Gamma_NonP = np.exp(-np.array([gq,gg]) * bT**2)
-        
+
     return Gamma_Pert*Gamma_NonP
 
 def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
@@ -779,36 +791,38 @@ if __name__ == '__main__':
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
     # Test of Gamma_tilde_Resum_Evo(mu,bT)
-    '''
+    #'''
     gammainit = np.array([0.7,0.7])
     Qlst = np.linspace(20, 100, 5)
-    bTlst = np.linspace(10. ** (-6),5,100)
+    epsilon = 10 ** (-8)
+    bTlst = np.linspace(epsilon,10,2001)
     
     bmax = 1.5
     gq = 0.5    
     gg = 0.5
-    Gamma_tilde_Resum_cal_plt(gammainit,Qlst,bTlst,bmax,gq,gg )
-    '''
-    
+    Gamma_tilde_Resum_cal_plt(gammainit,Qlst,bTlst,bmax,gq,gg,nlooplog=1 )
     #'''
+    
+    '''
     gammainit=np.array([0.754,0.824])
     theta_lst = 2*np.exp(np.linspace(np.log(10**(-4)), np.log(0.7), 30))
-    Qlst = np.array([50.,100.,200.])
+    Qlst = np.array([100.,300.,500.])
 
+    #c = 0.346*0.5
     
     bmax = 1.5
-    gq = 0.35
-    gg = 0.35
-    fq = 1
-    fg = 0
+    gq = 1
+    gg = 1
+    fq = 0.8
+    fg = 0.2
     #nlooplog=1
     dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg,1)
-    #'''
+    '''
     
     
-    #'''
+    '''
     zlst = np.exp(np.linspace(np.log(10**(-8)), np.log(0.5), 40))
     #Qlst = np.array([50.,100.,200.])
     dEEC_cal_plt(zlst,Qlst)
-    #'''
+    '''
  

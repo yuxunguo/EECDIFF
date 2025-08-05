@@ -63,13 +63,13 @@ def plot_EEC_by_theta(PlotDF):
     # Group by Q values
     groups = list(PlotDF.groupby('Q'))
     n_plots = len(groups)
-    ncols = 4
+    ncols = 3
     nrows = 2
     n_per_figure = nrows * ncols
 
     for fig_idx in range(0, n_plots, n_per_figure):
-        fig, axes = plt.subplots(nrows, ncols, figsize=(24, 12))
-        axes = axes.flatten()  # flatten in case we don’t fill all 8 subplots
+        fig, axes = plt.subplots(nrows, ncols, figsize=(18, 12))
+        axes = axes.flatten()  # flatten in case we don’t fill all 6 subplots
 
         for ax_idx, (Qval, group) in enumerate(groups[fig_idx:fig_idx+n_per_figure]):
             ax = axes[ax_idx]
@@ -91,7 +91,7 @@ def plot_EEC_by_theta(PlotDF):
             axes[j].axis('off')
 
         plt.tight_layout()
-        plt.savefig("Output/myplot.pdf", dpi=300, bbox_inches='tight')
+        plt.savefig("Output/FitReleaseBmax.pdf", dpi=300, bbox_inches='tight')
 
 if __name__ == '__main__':
     pool = Pool()
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     plot_EEC_by_theta(TestDF)
     print(TestDF['cost'].sum()/len(TestDF))
     '''
-    fixed_params = ["Gammaq", "Gammag","bmax",
+    fixed_params = ["Gammaq", "Gammag",#"bmax",
                     #"gq",
                     "gg",
                     "fq","fg",
@@ -131,6 +131,7 @@ if __name__ == '__main__':
     m.limits['gg'] = (0,3)
     m.limits['norm'] = (0,5)
     m.limits['muOverE'] = (0.01,10)
+    m.limits['bmax'] = (1,2)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
@@ -149,7 +150,7 @@ if __name__ == '__main__':
     best_fit_params = m.values.to_dict()
     
     Export_Mode = 1
-    EECdata = EECdata1
+    #EECdata = EECdata1
     TestDF = cost_EEC(**best_fit_params)
     plot_EEC_by_theta(TestDF)
     #'''

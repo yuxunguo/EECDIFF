@@ -9,8 +9,8 @@ import os, time
 
 EECdata1 = EEC_merged[(EEC_merged['z']<0.2) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
 
-EECdata1.loc[:,"f raw"]=EECdata1["f"]
-EECdata1.loc[:,"delta f raw"]=EECdata1["delta f"]
+EECdata1.loc[:,"f raw"]=EECdata1["f"]/2
+EECdata1.loc[:,"delta f raw"]=EECdata1["delta f"]/2
 EECdata1["f"] = EECdata1["f raw"] / EECdata1["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
 EECdata1["delta f"] = EECdata1["delta f raw"] / EECdata1["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
 
@@ -91,7 +91,7 @@ def plot_EEC_by_theta(PlotDF):
             axes[j].axis('off')
 
         plt.tight_layout()
-        plt.savefig("Output/FitReleaseBmax.pdf", dpi=300, bbox_inches='tight')
+        plt.savefig("Output/FitBmax_3_Exp.pdf", dpi=300, bbox_inches='tight')
 
 if __name__ == '__main__':
     pool = Pool()
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         "muOverE": 0.346,
         "Gammaq": 0.754,
         "Gammag": 0.824,
-        "bmax": 1.5,
+        "bmax": 3.0,
         "gq": 0.042,
         "gg": 0.042,
         "fq": 1,
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     plot_EEC_by_theta(TestDF)
     print(TestDF['cost'].sum()/len(TestDF))
     '''
-    fixed_params = ["Gammaq", "Gammag",#"bmax",
+    fixed_params = ["Gammaq", "Gammag","bmax",
                     #"gq",
                     "gg",
                     "fq","fg",
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     m.limits['gg'] = (0,3)
     m.limits['norm'] = (0,5)
     m.limits['muOverE'] = (0.01,10)
-    m.limits['bmax'] = (1,2)
+    m.limits['bmax'] = (1,3)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     best_fit_params = m.values.to_dict()
     
     Export_Mode = 1
-    #EECdata = EECdata1
+    EECdata = EECdata1
     TestDF = cost_EEC(**best_fit_params)
     plot_EEC_by_theta(TestDF)
     #'''

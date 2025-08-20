@@ -4,6 +4,7 @@ from scipy.integrate import simps
 from typing import Tuple, Union
 import rundec
 import pandas as pd
+from iminuit import Minuit
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
@@ -476,24 +477,32 @@ def dEEC_NNLL_resum(z: float, mu: float, nloop_alphaS: int, nf: int):
     
     return zdsigma_dz_ee_NNLL_SU3_5flavor_num/z
 
+GammaDF = pd.read_csv("ee_EEC_data/Sum_EEC_ee.txt", sep=r"\s+", header= 0, names = ['Q','f'])
+
 def Gamma_cal_plt(gammainit, Qlst, nlooplog):
-    
-    GammaEvolst=np.array([Gamma_Evo(gammainit, Q, nlooplog)   for Q in Qlst])
+
+    GammaEvolst=np.array([Gamma_Evo(gammainit, Q, nlooplog)  for Q in Qlst])
     
     GammaEvolstq = GammaEvolst[:,0]
     GammaEvolstg = GammaEvolst[:,1]
     
-    plt.plot(Qlst, GammaEvolstq,color='red',marker="o",label = r"$\Gamma_q$")
-    plt.plot(Qlst, GammaEvolstg,color='blue',marker="s",label = r"$\Gamma_g$")
-    plt.plot(Qlst, 1-GammaEvolstq,linestyle='--',color='red',marker="o", markerfacecolor='none',label = r"$\Gamma'_q$")
-    plt.plot(Qlst, 1-GammaEvolstg,color='blue',linestyle='--',marker="s", markerfacecolor='none',label = r"$\Gamma'_g$")
+    plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"$\Gamma_{e^+e^-}$")
     
-    plt.xlabel("Q (GeV)")
-    plt.ylabel("$\Gamma_i$")
+    plt.plot(Qlst, GammaDF['f pred'],color='magenta',label = r"NLO $\Sigma_2$")
+    
+    plt.plot(Qlst, (1+GammaEvolstq)/2,color='magenta',linestyle='--',label = r"LO $\Sigma_2$")
+    #plt.plot(Qlst, GammaEvolstg,color='blue',label = r"$\Gamma_g$")
+    #plt.plot(Qlst, 1-GammaEvolstq,linestyle='--',color='red', markerfacecolor='none',label = r"$\Gamma'_q$")
+    #plt.plot(Qlst, 1-GammaEvolstg,color='blue',linestyle='--', markerfacecolor='none',label = r"$\Gamma'_g$")
+    
+    plt.ylim(0.8, 1.0) 
+    
+    plt.xlabel("Q (GeV)", fontsize = 14)
+    plt.ylabel("$\Gamma_i$", fontsize = 14)
     plt.xscale("log")
     plt.grid(True)
-    plt.legend()
-    plt.show()
+    plt.legend(fontsize=14)
+    plt.savefig("Output/IntegratedEEC.pdf", format="pdf") 
 
 def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst,nlooplog):
     
@@ -701,11 +710,39 @@ def dEEC_cal_plt(zlst, Q_lst):
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    '''
-    gammainit = np.array([0.7,0.7])
-    Q1lst = np.exp(np.linspace(np.log(2),np.log(500),15))
-    Gamma_cal_plt(gammainit, Q1lst)
-    '''
+    #'''
+    Q1lst = np.array(GammaDF['Q'])
+    
+    def gammafit(gammaq,gammag):
+        gint=np.array([gammaq,gammag])
+        GammaEvolst=np.array([Gamma_Evo(gint, Q, 1)  for Q in Q1lst])
+        CF = 4/3
+        GammaEvolstq = GammaEvolst[:,0]
+        GammaEvolstg = GammaEvolst[:,1]
+
+        Aslst = np.array([AlphaS(3,5,Q) for Q in Q1lst])
+        
+        GammaDF['f pred'] = (1-Aslst/(2*np.pi)*3/2*CF)*(1/2 + Aslst/(4*np.pi)*CF*(-125/24)
+                +1/2 * GammaEvolstq + Aslst/(4*np.pi)* (131/12*GammaEvolstq-71/36*GammaEvolstg))
+        
+        return np.sum((np.array(GammaDF['f'])- GammaDF['f pred']) **2)
+    
+    m = Minuit(gammafit, gammaq=0.5, gammag=0.5)  # initial guesses
+    m.errordef = Minuit.LEAST_SQUARES  # 1 for least-squares cost
+
+    # Run the minimization
+    #'''
+    m.migrad()
+    m.limits['gammaq']=(0.01,0.99)
+    m.limits['gammag']=(0.01,0.99)
+    # Print fit results
+    print(m.values)   # best-fit parameters
+    print(m.errors)  
+    #'''
+    gammainit = np.array([0.754,0.824])
+    gammafit(0.754,0.824)
+    Gamma_cal_plt(gammainit, Q1lst,1)
+    #'''
     
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''

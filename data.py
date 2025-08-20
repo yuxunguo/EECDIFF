@@ -78,12 +78,16 @@ EEC_merged['z'] = (1-np.cos(EEC_merged['theta'] ))/2
 EEC_Sim1 = pd.read_csv("ee_EEC_data/Simulation/EEC_ee_22GeV.txt", comment="#", index_col=False, header=None, delim_whitespace=True, names = ["z","fz"])
 EEC_Sim2 = pd.read_csv("ee_EEC_data/Simulation/EEC_ee_59.5GeV.txt", comment="#", index_col=False, header=None, delim_whitespace=True, names = ["z","fz"])
 EEC_Sim3 = pd.read_csv("ee_EEC_data/Simulation/EEC_ee_91.2GeV.txt", comment="#", index_col=False, header=None, delim_whitespace=True, names = ["z","fz"])
+EEC_Sim4 = pd.read_csv("ee_EEC_data/Simulation/EEC_ee_300GeV.txt", comment="#", index_col=False, header=None, delim_whitespace=True, names = ["z","fz"])
+EEC_Sim5 = pd.read_csv("ee_EEC_data/Simulation/EEC_ee_600GeV.txt", comment="#", index_col=False, header=None, delim_whitespace=True, names = ["z","fz"])
 
 EEC_Sim1['Q']=22.0
 EEC_Sim2['Q']=59.5
 EEC_Sim3['Q']=91.2
+EEC_Sim4['Q']=300.0
+EEC_Sim5['Q']=600.0
 
-EEC_Simulate = pd.concat([EEC_Sim1,EEC_Sim2,EEC_Sim3], ignore_index=True)
+EEC_Simulate = pd.concat([EEC_Sim1,EEC_Sim2,EEC_Sim3,EEC_Sim4,EEC_Sim5], ignore_index=True)
 
 
 def invert_z(z):

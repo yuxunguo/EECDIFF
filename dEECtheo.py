@@ -722,7 +722,7 @@ if __name__ == '__main__':
 
         Aslst = np.array([AlphaS(3,5,Q) for Q in Q1lst])
         
-        GammaDF['f pred'] = (1-Aslst/(2*np.pi)*3/2*CF)*(1/2 + Aslst/(4*np.pi)*CF*(-125/24)
+        GammaDF['f pred'] = (1-Aslst/(2*np.pi)*3/2*CF)*(1/2 + Aslst/(4*np.pi)*CF*(-89/24)
                 +1/2 * GammaEvolstq + Aslst/(4*np.pi)* (131/12*GammaEvolstq-71/36*GammaEvolstg))
         
         return np.sum((np.array(GammaDF['f'])- GammaDF['f pred']) **2)

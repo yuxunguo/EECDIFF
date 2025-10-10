@@ -25,7 +25,7 @@ Export_Mode = 0
 
 def compute_EEC(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log):
     z = (1 - np.cos(theta)) / 2
-    f = theta * dEEC(theta, muOverE/2 * Q, gamma_init, bmax, gq/muOverE**2, gg/muOverE**2, fq, fg, nloop_log)
+    f = theta * dEEC(theta, muOverE/2 * Q, gamma_init, bmax, gq, gg, fq, fg, nloop_log)
     dEECz = 2 / np.sin(theta) * f
     return (theta, Q, f, z, dEECz)
 
@@ -91,17 +91,17 @@ def plot_EEC_by_theta(PlotDF):
             axes[j].axis('off')
 
         plt.tight_layout()
-        plt.savefig("Output/FitBmax_3_Exp.pdf", dpi=300, bbox_inches='tight')
+        plt.savefig("Output/FitBmax_3.pdf", dpi=300, bbox_inches='tight')
 
 if __name__ == '__main__':
     pool = Pool()
     init_params = {
-        "muOverE": 0.346,
+        "muOverE": 1.0,
         "Gammaq": 0.754,
         "Gammag": 0.824,
-        "bmax": 3.0,
-        "gq": 0.042,
-        "gg": 0.042,
+        "bmax": 1.5,
+        "gq": 1.0,
+        "gg": 1.0,
         "fq": 1,
         "fg": 0,
         "norm": 0.6*0.346,
@@ -113,9 +113,11 @@ if __name__ == '__main__':
     plot_EEC_by_theta(TestDF)
     print(TestDF['cost'].sum()/len(TestDF))
     '''
-    fixed_params = ["Gammaq", "Gammag","bmax",
+    fixed_params = ["Gammaq", "Gammag",
+                    #"muOverE",
+                    #"bmax",
                     #"gq",
-                    "gg",
+                    #"gg",
                     "fq","fg",
                     #"norm"
                     ] 
@@ -127,11 +129,11 @@ if __name__ == '__main__':
     for name in fixed_params:
         m.fixed[name] = True
     
-    m.limits['gq'] = (0,3)
-    m.limits['gg'] = (0,3)
+    m.limits['gq'] = (0,30)
+    m.limits['gg'] = (0,30)
     m.limits['norm'] = (0,5)
     m.limits['muOverE'] = (0.01,10)
-    m.limits['bmax'] = (1,3)
+    m.limits['bmax'] = (1,3.5)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
@@ -150,7 +152,7 @@ if __name__ == '__main__':
     best_fit_params = m.values.to_dict()
     
     Export_Mode = 1
-    EECdata = EECdata1
+    EECdata = EECdata2
     TestDF = cost_EEC(**best_fit_params)
     plot_EEC_by_theta(TestDF)
     #'''

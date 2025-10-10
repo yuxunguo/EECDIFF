@@ -421,7 +421,8 @@ def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, g
     def integrand(bT):
         bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
         Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
-        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+        #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
         Gamma = Gamma_Pert * Gamma_NonP
         gamma_dot = np.dot(Gamma, fqg)
         return bT * j0(theta * bT * Q) * gamma_dot
@@ -705,12 +706,12 @@ def dEEC_cal_plt(zlst, Q_lst):
     ax.set_xscale("log")
     ax.set_yscale("log")
     
-    plt.savefig("Output/dEECcompare.pdf",bbox_inches='tight')
+    plt.savefig("Output/dEECcompare35.pdf",bbox_inches='tight')
 
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    #'''
+    '''
     Q1lst = np.array(GammaDF['Q'])
     
     def gammafit(gammaq,gammag):
@@ -731,18 +732,18 @@ if __name__ == '__main__':
     m.errordef = Minuit.LEAST_SQUARES  # 1 for least-squares cost
 
     # Run the minimization
-    #'''
+
     m.migrad()
     m.limits['gammaq']=(0.01,0.99)
     m.limits['gammag']=(0.01,0.99)
     # Print fit results
     print(m.values)   # best-fit parameters
     print(m.errors)  
-    #'''
+
     gammainit = np.array([0.754,0.824])
     gammafit(0.754,0.824)
     Gamma_cal_plt(gammainit, Q1lst,1)
-    #'''
+    '''
     
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
@@ -752,26 +753,26 @@ if __name__ == '__main__':
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
     
-    '''
+    #'''
     gammainit=np.array([0.754,0.824])
     theta_lst = 2*np.exp(np.linspace(np.log(10**(-4)), np.log(0.7), 30))
-    Qlst = np.array([100.,300.,500.])
+    Qlst = np.array([50.,100.,200.])
 
     #c = 0.346*0.5
     
     bmax = 1.5
-    gq = 1
-    gg = 1
+    gq = 35
+    gg = 35
     fq = 0.8
     fg = 0.2
     #nlooplog=1
     dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg,1)
-    '''
+    #'''
     
     
-    '''
+    #'''
     zlst = np.exp(np.linspace(np.log(10**(-8)), np.log(0.5), 40))
-    #Qlst = np.array([50.,100.,200.])
+    Qlst = np.array([50.,100.,200.])
     dEEC_cal_plt(zlst,Qlst)
-    '''
+    #'''
  

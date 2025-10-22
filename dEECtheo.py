@@ -13,7 +13,8 @@ from matplotlib.patches import Patch,Rectangle
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from functools import cache, lru_cache
-from scipy.integrate import quad
+from scipy.integrate import quad, quad_vec
+from multiprocessing import Pool
 
 NC = 3
 CF = (NC**2 - 1) / (2 * NC)
@@ -412,6 +413,68 @@ def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.ndarray, mu: float, bT: float, n
 
 BMAX_INTEGRAL = 30
 
+'''
+def Gamma_tilde_ResumLLA(Gamma_Init: np.ndarray, Q: float, bT: float, bmax: float, gq: float, gg: float, nlooplog: int):
+    bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
+    Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
+    Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
+    return Gamma_Pert * Gamma_NonP
+
+def Gamma_tilde_Resum(Gamma_Init: np.ndarray, Q: float, bmax: float, gq: float, gg: float, nlooplog: int):
+
+    logbT = np.linspace(np.log(0.001),np.log(BMAX_INTEGRAL),100)
+    bTlst = np.exp(logbT)
+    muinit = 100 # Initial scale for evolution
+    
+    Gamma_tilde_LLA_Init = np.array([[bt,*Gamma_tilde_ResumLLA(Gamma_Init, muinit, bt, bmax, gq, gg, nlooplog)] for bt in bTlst])
+
+    return Gamma_tilde_LLA_Init
+'''
+
+def dEECNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
+    
+    fqg=np.array([fq,fg])
+    
+    def integrand(bT):
+        
+        def gammares(bT):
+            
+            def gammaresLLA(bT):
+                bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
+                Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
+                #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+                Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
+                Gamma = Gamma_Pert * Gamma_NonP
+                
+                return Gamma
+        
+            def xintegrand(x):
+                AS = AlphaS(3,5,Q)/(2*np.pi)
+                Gamma = gammaresLLA(bT)
+                Gammax = gammaresLLA(bT/x)
+                integrandq = (3*Gamma[0] * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^2 dx from 0 to 1= 1/3. A factor of 3 for normalization
+                            +CF * AS * Gammax[0] * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
+                            +CF * AS * np.log(1-x)/(1-x) * ((1+x**2)*Gammax[0] - 2*Gamma[0])
+                            -3/2 * CF * AS * 1/(1-x) * (Gammax[0] - Gamma[0]))
+                
+                integrandg = CF * AS * (1+(1-x)**2)/x *np.log(x**2*(1-x)) * Gammax[1]
+                
+                return np.array([integrandq, integrandg])* x**2/2
+            
+            gammaNLO, _ = quad_vec(xintegrand,0,1)
+            
+            return gammaNLO
+        
+        gammanlo = gammares(bT)
+        gamma_dot = np.dot(gammanlo, fqg)
+        return bT * j0(theta * bT * Q) * gamma_dot
+
+    integral, error = quad(integrand, 0, BMAX_INTEGRAL, epsabs=1e-6, epsrel=1e-6, limit=200)
+    result = integral * Q**2
+    
+    return result
+
+
 def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     
     hqhg = HqHg(Q,nlooplog)
@@ -542,18 +605,38 @@ def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst,nlooplog):
     plt.legend()
     plt.show()
 
+def EEC_Compute_Aux(args):
+    theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog = args
+    z = (1 - np.cos(theta)) / 2
+
+    f = dEEC(theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog)
+    fz = 2 * theta / np.sin(theta) * f
+
+    fNLO = dEECNLO(theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog)
+    fzNLO = 2 * theta / np.sin(theta) * fNLO
+
+    return (theta, Q, f, z, fz, fNLO, fzNLO)
+    
 def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     
     #'''
-    EEC = []
-    for theta in theta_lst:
-        for Q in Q_lst:
-            z= (1- np.cos(theta))/2
-            f = dEEC(theta, Q, gammainit, bmax, gq, gg, fq, fg,nlooplog)
-            fz = 2*theta/np.sin(theta)*f
-            EEC.append((theta, Q, f,z,fz))
+    def parallel_EEC(theta_lst, Q_lst, gammainit, bmax, gq, gg, fq, fg, nlooplog, nproc=8):
+        # Prepare all combinations of (theta, Q)
+        args_list = [
+            (theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog)
+            for theta in theta_lst
+            for Q in Q_lst
+        ]
 
-    df = pd.DataFrame(EEC, columns=["theta", "Q", "dEEC","z","dEECz"])
+        # Run in parallel
+        with Pool() as pool:
+            results = pool.map(EEC_Compute_Aux, args_list)
+
+        return results
+    
+    EEC = parallel_EEC(theta_lst, Q_lst, gammainit, bmax, gq, gg, fq, fg, nlooplog)
+    
+    df = pd.DataFrame(EEC, columns=["theta", "Q", "dEEC","z","dEECz", "dEECNLO", "dEECzNLO"])
     df.to_csv("Output/dEECcal.csv", index=False)
     #'''
     df = pd.read_csv("Output/dEECcal.csv")
@@ -561,11 +644,16 @@ def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     df_Q1 = df[df["Q"] == Q_lst[0]]
     df_Q2 = df[df["Q"] == Q_lst[1]]
     df_Q3 = df[df["Q"] == Q_lst[2]]
+    
+    colors = plt.cm.tab10.colors 
+    
+    plt.plot(Q_lst[0]**2*df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEEC"], color=colors[0],linestyle='-',label = f"Q={Q_lst[0]} GeV")
+    plt.plot(Q_lst[1]**2*df_Q2["z"], 1/Q_lst[1]**2 * df_Q2["dEEC"], color=colors[1],linestyle='-',label = f"Q={Q_lst[1]} GeV")
+    plt.plot(Q_lst[2]**2*df_Q3["z"], 1/Q_lst[2]**2 * df_Q3["dEEC"], color=colors[2],linestyle='-',label = f"Q={Q_lst[2]} GeV")
 
-    plt.plot(Q_lst[0]**2*df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEEC"], marker='o',label = f"Q={Q_lst[0]} GeV")
-    plt.plot(Q_lst[1]**2*df_Q2["z"], 1/Q_lst[1]**2 * df_Q2["dEEC"], marker='s',label = f"Q={Q_lst[1]} GeV")
-    plt.plot(Q_lst[2]**2*df_Q3["z"], 1/Q_lst[2]**2 * df_Q3["dEEC"], marker='^',label = f"Q={Q_lst[2]} GeV")
-
+    plt.plot(Q_lst[0]**2*df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEECNLO"], color=colors[0],linestyle='--', label = f"Q={Q_lst[0]} GeV (NLO)")
+    plt.plot(Q_lst[1]**2*df_Q2["z"], 1/Q_lst[1]**2 * df_Q2["dEECNLO"], color=colors[1],linestyle='--', label = f"Q={Q_lst[1]} GeV (NLO)")
+    plt.plot(Q_lst[2]**2*df_Q3["z"], 1/Q_lst[2]**2 * df_Q3["dEECNLO"], color=colors[2],linestyle='--', label = f"Q={Q_lst[2]} GeV (NLO)")
     #plt.xlim(0.002,50)
     
     plt.xlabel(r"$z\bar{E}^2$")
@@ -761,18 +849,19 @@ if __name__ == '__main__':
     #c = 0.346*0.5
     
     bmax = 1.5
-    gq = 35
-    gg = 35
-    fq = 0.8
-    fg = 0.2
-    #nlooplog=1
+    gq = 1.1842
+    gg = 1.0
+
+    fq = 1.0
+    fg = 0.0
+    nlooplog=1
     dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg,1)
-    #'''
+    ''
     
     
-    #'''
+    '''
     zlst = np.exp(np.linspace(np.log(10**(-8)), np.log(0.5), 40))
     Qlst = np.array([50.,100.,200.])
     dEEC_cal_plt(zlst,Qlst)
-    #'''
+    '''
  

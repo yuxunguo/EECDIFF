@@ -115,7 +115,7 @@ if __name__ == '__main__':
     '''
     fixed_params = ["Gammaq", "Gammag",
                     #"muOverE",
-                    #"bmax",
+                    "bmax",
                     #"gq",
                     #"gg",
                     "fq","fg",

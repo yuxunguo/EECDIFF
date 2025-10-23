@@ -431,41 +431,46 @@ def Gamma_tilde_Resum(Gamma_Init: np.ndarray, Q: float, bmax: float, gq: float, 
     return Gamma_tilde_LLA_Init
 '''
 
+@lru_cache(maxsize=None)
+def GammaRes_NLO(Q: float, bT: float, Gammaq: float, Gammag: float, bmax: float, gq: float, gg: float, nlooplog: int):
+    
+    Gamma_Init = np.array([Gammaq, Gammag])
+    
+    def gammaresLLA(bT):
+        bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
+        Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
+        #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
+        Gamma = Gamma_Pert * Gamma_NonP
+        
+        return Gamma
+
+    def xintegrand(x):
+        AS = AlphaS(3,5,Q)/(2*np.pi)
+        Gamma = gammaresLLA(bT)
+        Gammax = gammaresLLA(bT/x)
+        integrandq = (3*Gamma[0] * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^2 dx from 0 to 1= 1/3. A factor of 3 for normalization
+                    +CF * AS * Gammax[0] * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
+                    +CF * AS * np.log(1-x)/(1-x) * ((1+x**2)*Gammax[0] - 2*Gamma[0])
+                    -3/2 * CF * AS * 1/(1-x) * (Gammax[0] - Gamma[0]))
+        
+        integrandg = CF * AS * (1+(1-x)**2)/x *np.log(x**2*(1-x)) * Gammax[1]
+        
+        return np.array([integrandq, integrandg])* x**2/2
+        
+    gammaNLO, _ = quad_vec(xintegrand,0,1)
+            
+    return gammaNLO
+
 def dEECNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     
     fqg=np.array([fq,fg])
+    Gammaq = Gamma_Init[0]
+    Gammag = Gamma_Init[1]
     
     def integrand(bT):
-        
-        def gammares(bT):
-            
-            def gammaresLLA(bT):
-                bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
-                Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
-                #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
-                Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
-                Gamma = Gamma_Pert * Gamma_NonP
-                
-                return Gamma
-        
-            def xintegrand(x):
-                AS = AlphaS(3,5,Q)/(2*np.pi)
-                Gamma = gammaresLLA(bT)
-                Gammax = gammaresLLA(bT/x)
-                integrandq = (3*Gamma[0] * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^2 dx from 0 to 1= 1/3. A factor of 3 for normalization
-                            +CF * AS * Gammax[0] * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
-                            +CF * AS * np.log(1-x)/(1-x) * ((1+x**2)*Gammax[0] - 2*Gamma[0])
-                            -3/2 * CF * AS * 1/(1-x) * (Gammax[0] - Gamma[0]))
-                
-                integrandg = CF * AS * (1+(1-x)**2)/x *np.log(x**2*(1-x)) * Gammax[1]
-                
-                return np.array([integrandq, integrandg])* x**2/2
-            
-            gammaNLO, _ = quad_vec(xintegrand,0,1)
-            
-            return gammaNLO
-        
-        gammanlo = gammares(bT)
+
+        gammanlo = GammaRes_NLO(Q,bT, Gammaq, Gammag, bmax, gq, gg, nlooplog)
         gamma_dot = np.dot(gammanlo, fqg)
         return bT * j0(theta * bT * Q) * gamma_dot
 

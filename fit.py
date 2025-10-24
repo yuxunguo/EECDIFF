@@ -1,4 +1,4 @@
-from dEECtheo import dEEC, tot_xsec_sum
+from dEECtheo import dEEC, tot_xsec_sum, dEECimprov
 from data import EEC_merged, EEC_Simulate
 import numpy as np 
 import pandas as pd
@@ -22,6 +22,12 @@ EECdata2 = EEC_Simulate[EEC_Simulate['theta']<0.3].copy().reset_index(drop=True)
 EECdata = EECdata2
 
 Export_Mode = 0
+
+def compute_EECimprov(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, Lambda):
+    z = (1 - np.cos(theta)) / 2
+    f = theta * dEECimprov(theta, muOverE/2 * Q, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, Lambda)
+    dEECz = 2 / np.sin(theta) * f
+    return (theta, Q, f, z, dEECz)
 
 def compute_EEC(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log):
     z = (1 - np.cos(theta)) / 2
@@ -52,6 +58,33 @@ def cost_EEC(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
 
     if(Export_Mode == 1):
         EECdataFit.to_csv('Output/Results.csv', index=False)
+        return EECdataFit
+    
+    return EECdataFit['cost'].sum()
+
+def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
+             gq: float, gg: float, fq: float, fg: float, norm: float, MU0, Lambda) -> float:
+    """Compute the chi-squared cost function for EEC data."""
+    gamma_init = np.array([Gammaq, Gammag])
+    nloop_log = 1
+    
+    tasks = [
+        (theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, gq)
+        for theta, Q in zip(EECdata['theta'], EECdata['Q'])
+    ]
+
+    EEC_rows = pool.starmap(compute_EECimprov, tasks)
+    
+    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz"])
+    
+    EECdataFit = EECdata.copy()
+    # Match predictions to EECdata and compute chi-squared
+    EECdataFit['pred'] = norm*pred_df['dEEC'].values
+    EECdataFit['predz'] = norm*pred_df['dEECz'].values
+    EECdataFit['cost'] = ((EECdataFit['pred'] - EECdataFit['f']) / EECdataFit['delta f'])**2
+
+    if(Export_Mode == 1):
+        EECdataFit.to_csv('Output/Results_improv.csv', index=False)
         return EECdataFit
     
     return EECdataFit['cost'].sum()
@@ -91,7 +124,7 @@ def plot_EEC_by_theta(PlotDF):
             axes[j].axis('off')
 
         plt.tight_layout()
-        plt.savefig("Output/FitBmax_3.pdf", dpi=300, bbox_inches='tight')
+        plt.savefig("Output/Fit_improv.pdf", dpi=300, bbox_inches='tight')
 
 if __name__ == '__main__':
     pool = Pool()
@@ -105,6 +138,20 @@ if __name__ == '__main__':
         "fq": 1,
         "fg": 0,
         "norm": 0.6*0.346,
+        #"MU0": 100
+    }
+    init_params_improve = {
+        "muOverE": 1.0,
+        "Gammaq": 0.754,
+        "Gammag": 0.824,
+        "bmax": 1.5,
+        "gq": 1.0,
+        "gg": 1.0,
+        "fq": 1,
+        "fg": 0,
+        "norm": 0.6*0.346,
+        "MU0": 100,
+        "Lambda": 1.2,
     }
 
     '''
@@ -121,19 +168,38 @@ if __name__ == '__main__':
                     "fq","fg",
                     #"norm"
                     ] 
+    
+    fixed_params_improve = ["Gammaq", "Gammag",
+                    #"muOverE",
+                    "bmax",
+                    #"gq",
+                    #"gg",
+                    "fq","fg",
+                    "MU0",
+                    "Lambda",
+                    #"norm"
+                    ] 
+    
     #'''
     time_start = time.time()
-    
+    '''
     m = Minuit(cost_EEC, **init_params)
 
     for name in fixed_params:
         m.fixed[name] = True
-    
+    '''
+    m = Minuit(cost_EECimprov, **init_params_improve)
+
+    for name in fixed_params_improve:
+        m.fixed[name] = True
+        
     m.limits['gq'] = (0,30)
     m.limits['gg'] = (0,30)
     m.limits['norm'] = (0,5)
     m.limits['muOverE'] = (0.01,10)
     m.limits['bmax'] = (1,3.5)
+    m.limits['MU0'] = (20,1000)
+    m.limits['Lambda'] = (0,30)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
@@ -141,7 +207,7 @@ if __name__ == '__main__':
     
     time_end = time.time() -time_start
     
-    with open('Output/Fit_summary.txt', 'w', encoding='utf-8') as f:
+    with open('Output/Fit_summary_improv.txt', 'w', encoding='utf-8') as f:
         print('Total running time: %.1f minutes. Total call of cost function: %3d.\n' % ( time_end/60, m.nfcn), file=f)
         print('The chi squared/d.o.f. is: %.2f / %3d ( = %.2f ).\n' % (m.fval, ndof, m.fval/ndof), file = f)
         print('Below are the final output parameters from iMinuit:', file = f)
@@ -153,6 +219,7 @@ if __name__ == '__main__':
     
     Export_Mode = 1
     EECdata = EECdata2
-    TestDF = cost_EEC(**best_fit_params)
+    #TestDF = cost_EEC(**best_fit_params)
+    TestDF = cost_EECimprov(**best_fit_params)
     plot_EEC_by_theta(TestDF)
     #'''

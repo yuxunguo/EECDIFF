@@ -1,3 +1,4 @@
+from math import tau
 import numpy as np
 from scipy.special import psi, j0, zeta
 from scipy.integrate import simps
@@ -411,6 +412,16 @@ def _Gamma_tilde_Pert_Evo(mu: float, bT: float, nlooplog: int, Gamma_Init_tuple:
 def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.ndarray, mu: float, bT: float, nlooplog: int):
     return _Gamma_tilde_Pert_Evo(mu, bT, nlooplog, tuple(Gamma_Init))
 
+
+def Cimp(MU:float, qT: float, MU0: float, Lambda: float):
+
+    Evo3 = evolop(J, NF, P, MU, MU0, nloop)
+    Evo5 = evolop(J+2, NF, P, MU, MU0, nloop)
+    
+    C_evo = (Evo3 @ np.linalg.inv(Evo5)) - np.eye(2)
+    
+    return np.eye(2) + C_evo* np.exp(-qT**2/Lambda**2)
+
 BMAX_INTEGRAL = 30
 
 '''
@@ -479,6 +490,27 @@ def dEECNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float
     
     return result
 
+def dEECimprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int, MU0: float, Lambda: float):
+    
+    hqhg = HqHg(Q,nlooplog)
+    fqg=np.array([fq,fg])
+    fqg= fqg * hqhg
+    
+    cimp = Cimp(Q, theta*Q, MU0, Lambda)
+
+    def integrand(bT):
+        bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
+        Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
+        #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
+        Gamma = Gamma_Pert * Gamma_NonP
+        gamma_dot = Gamma @ cimp @ fqg
+        return bT * j0(theta * bT * Q) * gamma_dot
+
+    integral, error = quad(integrand, 0, BMAX_INTEGRAL, epsabs=1e-6, epsrel=1e-6, limit=200)
+    result = integral * Q**2
+    
+    return result
 
 def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     

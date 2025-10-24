@@ -418,9 +418,10 @@ def Cimp(MU:float, qT: float, MU0: float, Lambda: float):
     Evo3 = evolop(J, NF, P, MU, MU0, nloop)
     Evo5 = evolop(J+2, NF, P, MU, MU0, nloop)
     
-    C_evo = (Evo3 @ np.linalg.inv(Evo5)) - np.eye(2)
+    C_evo = (np.linalg.inv(Evo3) @ Evo5) - np.eye(2)
     
     return np.eye(2) + C_evo* np.exp(-qT**2/Lambda**2)
+    #return np.eye(2) + C_evo* np.exp(-qT/Lambda)
 
 BMAX_INTEGRAL = 30
 

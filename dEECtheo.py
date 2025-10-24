@@ -837,7 +837,7 @@ def dEEC_cal_plt(zlst, Q_lst):
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    '''
+    #'''
     Q1lst = np.array(GammaDF['Q'])
     
     def gammafit(gammaq,gammag):
@@ -853,7 +853,7 @@ if __name__ == '__main__':
                 +1/2 * GammaEvolstq + Aslst/(4*np.pi)* (131/12*GammaEvolstq-71/36*GammaEvolstg))
         
         return np.sum((np.array(GammaDF['f'])- GammaDF['f pred']) **2)
-    
+    '''
     m = Minuit(gammafit, gammaq=0.5, gammag=0.5)  # initial guesses
     m.errordef = Minuit.LEAST_SQUARES  # 1 for least-squares cost
 
@@ -865,11 +865,11 @@ if __name__ == '__main__':
     # Print fit results
     print(m.values)   # best-fit parameters
     print(m.errors)  
-
+    '''
     gammainit = np.array([0.754,0.824])
     gammafit(0.754,0.824)
     Gamma_cal_plt(gammainit, Q1lst,1)
-    '''
+    #'''
     
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
@@ -879,7 +879,7 @@ if __name__ == '__main__':
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
     
-    #'''
+    '''
     gammainit=np.array([0.754,0.824])
     theta_lst = 2*np.exp(np.linspace(np.log(10**(-4)), np.log(0.7), 30))
     Qlst = np.array([50.,100.,200.])
@@ -894,7 +894,7 @@ if __name__ == '__main__':
     fg = 0.0
     nlooplog=1
     dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg,1)
-    ''
+    '''
     
     
     '''

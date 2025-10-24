@@ -99,7 +99,7 @@ def invert_z(z):
     return theta
 
 EEC_Simulate['theta'] = invert_z(EEC_Simulate['z'])
-EEC_Simulate['delta fz'] = 0.1*EEC_Simulate['fz']
+EEC_Simulate['delta fz'] = 0.05*EEC_Simulate['fz']
 
 EEC_Simulate['f'] = EEC_Simulate['fz'] * np.sin(EEC_Simulate['theta'])/2
-EEC_Simulate['delta f'] = 0.1* EEC_Simulate['f']
+EEC_Simulate['delta f'] = 0.05* EEC_Simulate['f']

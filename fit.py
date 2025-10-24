@@ -149,8 +149,8 @@ if __name__ == '__main__':
         "gg": 1.0,
         "fq": 1,
         "fg": 0,
-        "norm": 0.6*0.346,
-        "MU0": 100,
+        "norm": 0.4,
+        "MU0": 20,
         "Lambda": 1.2,
     }
 
@@ -170,12 +170,12 @@ if __name__ == '__main__':
                     ] 
     
     fixed_params_improve = ["Gammaq", "Gammag",
-                    #"muOverE",
+                    "muOverE",
                     "bmax",
                     #"gq",
                     #"gg",
                     "fq","fg",
-                    "MU0",
+                    #"MU0",
                     "Lambda",
                     #"norm"
                     ] 

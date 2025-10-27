@@ -6,6 +6,8 @@ from iminuit import Minuit
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import os, time
+from matplotlib import rcParams
+from matplotlib.ticker import MaxNLocator, LogLocator
 
 EECdata1 = EEC_merged[(EEC_merged['z']<0.2) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
 
@@ -89,42 +91,106 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     
     return EECdataFit['cost'].sum()
 
-def plot_EEC_by_theta(PlotDF):
-    # Sort by theta for smooth curves
-    PlotDF = PlotDF.sort_values(by='theta')
+def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf"):
 
-    # Group by Q values
+    # Global font settings
+    rcParams.update({
+        'font.size': 12,
+        'axes.labelsize': 12,
+        'ytick.labelsize': 11,
+        'xtick.labelsize': 11,
+        'legend.fontsize': 11,
+        'lines.linewidth': 2,
+        'lines.markersize': 3,
+    })
+
+    os.makedirs("Output", exist_ok=True)
+
+    PlotDF = PlotDF.sort_values(by='theta')
     groups = list(PlotDF.groupby('Q'))
     n_plots = len(groups)
-    ncols = 3
-    nrows = 2
+
+    ncols = 2
+    nrows = 3
     n_per_figure = nrows * ncols
 
     for fig_idx in range(0, n_plots, n_per_figure):
-        fig, axes = plt.subplots(nrows, ncols, figsize=(18, 12))
-        axes = axes.flatten()  # flatten in case we don’t fill all 6 subplots
+        print(fig_idx)
+        n_plots_remaining = min(n_per_figure, n_plots - fig_idx)
+        nrows_eff = int(np.ceil(n_plots_remaining / ncols))
 
-        for ax_idx, (Qval, group) in enumerate(groups[fig_idx:fig_idx+n_per_figure]):
-            ax = axes[ax_idx]
+        # Shared x-axis and tight vertical layout
+        fig, axes = plt.subplots(
+            nrows_eff, ncols, 
+            figsize=(3.5 * ncols, 2.5 * nrows_eff),
+            sharex='col',  # share x-axis only within each column
+            gridspec_kw={'hspace': 0.0, 'wspace': 0.0}
+        )
+        axes = np.array(axes).reshape(nrows_eff, ncols)
+        
+        ax_idx = 0
+        for row in range(nrows_eff):
+            for col in range(ncols):
 
-            ax.errorbar(group['theta'], 1/group['theta']*group['f'], yerr=1/group['theta']*group['delta f'],
-                        fmt='o', capsize=3, markersize=4, label="Data", alpha=0.6)
-            ax.plot(group['theta']  , 1/group['theta']*group['pred'], label="Model", lw=2)
+                if col == ncols - 1 and row < n_per_figure - n_plots:
+                    axes[row, col].axis('off')
+                    continue
+                
+                Qval, group = groups[fig_idx + ax_idx]
+                group = group[group['theta'] > 0]
+                ax = axes[row, col]
 
-            ax.set_title(f"Q = {Qval}")
-            ax.set_xlabel(r"$theta$")
-            ax.set_ylabel("dEEC/dtheta")
-            ax.set_yscale("log")
-            ax.set_xscale("log")
-            ax.legend()
-            ax.grid(True)
+                ax.errorbar(group['theta'], 1/group['theta'] * group['f'],
+                            yerr=1/group['theta'] * group['delta f'],
+                            fmt='o', capsize=3, markersize=3, label="PYTHIA", alpha=0.6)
 
-        # Hide any unused subplots
-        for j in range(ax_idx + 1, len(axes)):
-            axes[j].axis('off')
+                ax.plot(group['theta'], 1/group['theta'] * group['pred'],
+                    label="Theory Fit")
+                
+                # Text inside plot instead of title
+                ax.text(0.05, 0.5, f"Q = {Qval} GeV", transform=ax.transAxes,
+                        fontsize=12, fontweight='bold', ha='left', va='top')
 
-        plt.tight_layout()
-        plt.savefig("Output/Fit_improv.pdf", dpi=300, bbox_inches='tight')
+                ax.set_yscale("log")
+                ax.set_xscale("log")
+
+                col_idx = col
+                
+                if col_idx == 0:  # left-most column
+                    ax.set_ylabel(r"$\frac{dEEC}{\theta d\theta}$",fontsize=14)
+                    #ax.yaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
+                    ax.yaxis.set_ticks_position('left')
+                elif col_idx == ncols - 1:  # right-most column
+                    #ax.yaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
+                    ax.yaxis.set_ticks_position('right')
+                else:  # middle columns
+                    ax.yaxis.set_ticks_position('none')  # or 'left' if you prefer
+                
+
+                # Only hide x-axis labels for top rows, show for bottom row
+                if row < nrows_eff - 1:
+                    ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                    ax.set_xlabel("")
+                else:
+                    ax.set_xlabel(r"$\theta$")
+                    ax.tick_params(axis='x', which='both', bottom=True, top=True, labelbottom=True)
+                    #ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
+
+                # Reorder legend handles explicitly
+                handles, labels = ax.get_legend_handles_labels()
+                # Ensure "Theory Fit" first, "PYTHIA" second
+                order = [labels.index("PYTHIA"), labels.index("Theory Fit")]
+                ax.legend([handles[i] for i in order], [labels[i] for i in order],
+                        frameon=False, loc="best", fontsize=12)
+                
+                ax.grid(True, which="both", ls="--", alpha=0.5)
+                
+                ax_idx += 1
+
+        plt.tight_layout(pad=0.5)
+        plt.savefig(f"Output/{filename}.pdf",
+                    dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
 if __name__ == '__main__':
     pool = Pool()
@@ -217,9 +283,11 @@ if __name__ == '__main__':
         
     best_fit_params = m.values.to_dict()
     
+    best_fit_params["norm"] = 0.5
     Export_Mode = 1
-    EECdata = EECdata2
+    EECdata = EECdata1
     #TestDF = cost_EEC(**best_fit_params)
     TestDF = cost_EECimprov(**best_fit_params)
-    plot_EEC_by_theta(TestDF)
+    
+    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Exp.pdf")
     #'''

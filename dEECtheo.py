@@ -16,6 +16,7 @@ from scipy.interpolate import interp1d
 from functools import cache, lru_cache
 from scipy.integrate import quad, quad_vec
 from multiprocessing import Pool
+import matplotlib.ticker as ticker
 
 NC = 3
 CF = (NC**2 - 1) / (2 * NC)
@@ -588,22 +589,28 @@ def Gamma_cal_plt(gammainit, Qlst, nlooplog):
     GammaEvolstq = GammaEvolst[:,0]
     GammaEvolstg = GammaEvolst[:,1]
     
-    plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"$\Gamma_{e^+e^-}$")
+    plt.figure(figsize=(5.5, 4)) 
     
-    plt.plot(Qlst, GammaDF['f pred'],color='magenta',label = r"NLO $\Sigma_2$")
+    plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"PYTHIA")
+    plt.plot(Qlst, (1+GammaEvolstq)/2,color='magenta',linestyle='--',label = r"LO Theory")
+    plt.plot(Qlst, GammaDF['f pred'],color='magenta',label = r"NLO Theory")
     
-    plt.plot(Qlst, (1+GammaEvolstq)/2,color='magenta',linestyle='--',label = r"LO $\Sigma_2$")
+
     #plt.plot(Qlst, GammaEvolstg,color='blue',label = r"$\Gamma_g$")
     #plt.plot(Qlst, 1-GammaEvolstq,linestyle='--',color='red', markerfacecolor='none',label = r"$\Gamma'_q$")
     #plt.plot(Qlst, 1-GammaEvolstg,color='blue',linestyle='--', markerfacecolor='none',label = r"$\Gamma'_g$")
     
-    plt.ylim(0.8, 1.0) 
+    plt.xlim(12.5, 580) 
+    plt.ylim(0.80, 1.0) 
     
-    plt.xlabel("Q (GeV)", fontsize = 14)
-    plt.ylabel("$\Gamma_i$", fontsize = 14)
+    plt.title(r"Integrated EEC in $e^+e^-$ from PYTHIA and theory", fontsize = 14)
+    plt.xlabel("Q (GeV)", fontsize = 13)
+    plt.ylabel("$\Sigma_2$", fontsize = 13)
     plt.xscale("log")
+    plt.xticks([15, 30, 50, 100, 200, 500], ["15", "30", "50", "100", "200", "500"])
     plt.grid(True)
-    plt.legend(fontsize=14)
+    plt.legend(fontsize=13)
+    plt.tight_layout(pad=0.1)
     plt.savefig("Output/IntegratedEEC.pdf", format="pdf") 
 
 def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst,nlooplog):

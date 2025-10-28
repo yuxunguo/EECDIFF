@@ -115,14 +115,13 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf"):
     n_per_figure = nrows * ncols
 
     for fig_idx in range(0, n_plots, n_per_figure):
-        print(fig_idx)
         n_plots_remaining = min(n_per_figure, n_plots - fig_idx)
         nrows_eff = int(np.ceil(n_plots_remaining / ncols))
 
         # Shared x-axis and tight vertical layout
         fig, axes = plt.subplots(
             nrows_eff, ncols, 
-            figsize=(3.5 * ncols, 2.5 * nrows_eff),
+            figsize=(3.0 * ncols, 2.5 * nrows_eff),
             sharex='col',  # share x-axis only within each column
             gridspec_kw={'hspace': 0.0, 'wspace': 0.0}
         )
@@ -157,22 +156,18 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf"):
                 col_idx = col
                 
                 if col_idx == 0:  # left-most column
-                    ax.set_ylabel(r"$\frac{dEEC}{\theta d\theta}$",fontsize=14)
-                    #ax.yaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
                     ax.yaxis.set_ticks_position('left')
                 elif col_idx == ncols - 1:  # right-most column
-                    #ax.yaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
                     ax.yaxis.set_ticks_position('right')
                 else:  # middle columns
                     ax.yaxis.set_ticks_position('none')  # or 'left' if you prefer
-                
-
+            
                 # Only hide x-axis labels for top rows, show for bottom row
                 if row < nrows_eff - 1:
                     ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
                     ax.set_xlabel("")
                 else:
-                    ax.set_xlabel(r"$\theta$")
+                    ax.set_xlabel(r"$\frac{dEEC}{\theta d\theta}$ v.s. $\theta$")
                     ax.tick_params(axis='x', which='both', bottom=True, top=True, labelbottom=True)
                     #ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
 
@@ -188,7 +183,7 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf"):
                 ax_idx += 1
 
         plt.tight_layout(pad=0.5)
-        plt.savefig(f"Output/{filename}.pdf",
+        plt.savefig(f"Output/{filename}",
                     dpi=300, bbox_inches='tight')
         plt.close(fig)
 
@@ -282,6 +277,13 @@ if __name__ == '__main__':
         print(m.params, file = f)
         
     best_fit_params = m.values.to_dict()
+    
+    Export_Mode = 1
+    EECdata = EECdata2
+    #TestDF = cost_EEC(**best_fit_params)
+    TestDF = cost_EECimprov(**best_fit_params)
+    
+    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Sim.pdf")
     
     best_fit_params["norm"] = 0.5
     Export_Mode = 1

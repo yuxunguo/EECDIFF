@@ -1,4 +1,4 @@
-from dEECtheo import dEEC, tot_xsec_sum, dEECimprov, dEEC_NNLL_resum
+from dEECtheo import dEEC, tot_xsec_sum, dEECimprov, dEEC_NNLL_resum, dEEC_fixed_order
 from data import EEC_merged, EEC_Simulate
 import numpy as np 
 import pandas as pd
@@ -68,7 +68,11 @@ def compute_EECimprov(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop
     dEECz = 2 / np.sin(theta) * f
     dEECzNNLL = dEEC_NNLL_resum(z, muOverE/2 * Q, 3, 5)
     fNNLL = dEECzNNLL * np.sin(theta)/2
-    return (theta, Q, f, z, dEECz, fNNLL, dEECzNNLL)
+    
+    dEECzNLO = dEEC_fixed_order(z, muOverE/2 * Q, 3, 5,2)
+    fNLO = dEECzNLO * np.sin(theta)/2
+
+    return (theta, Q, f, z, dEECz, fNNLL, dEECzNNLL, fNLO, dEECzNLO)
 
 
 def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
@@ -84,7 +88,7 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
 
     EEC_rows = pool.starmap(compute_EECimprov, tasks)
     
-    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL"])
+    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL", "dEECNLO","dEECzNLO"])
     
     EECdataFit = EECdata.copy()
     # Match predictions to EECdata and compute chi-squared
@@ -93,6 +97,8 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     
     EECdataFit['predNNLL'] = norm*pred_df['dEECNNLL'].values
     EECdataFit['predzNNLL'] = norm*pred_df['dEECzNNLL'].values
+    EECdataFit['predNLO'] = norm*pred_df['dEECNLO'].values
+    EECdataFit['predzNLO'] = norm*pred_df['dEECzNLO'].values
     
     EECdataFit['cost'] = ((EECdataFit['pred'] - EECdataFit['f']) / EECdataFit['delta f'])**2
 
@@ -158,7 +164,7 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 y_err = inv_theta * group['delta f']
                 y_pred = inv_theta * group['pred']
                 y_predNNLL = inv_theta * group['predNNLL']
-
+                y_predNLO = inv_theta * group['predNLO']
                 # --- Compute y-limits based on the first two datasets only (ignoring NaNs or <=0 values) ---
                 y_ref = np.concatenate([y_f[y_f > 0], y_pred[y_pred > 0]])
                 ymin_plot, ymax_plot = np.nanmin(y_ref), np.nanmax(y_ref)
@@ -176,6 +182,8 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 # --- Truncate divergent NNLL curve before plotting ---
                 mask = (y_predNNLL > ymin_plot) & (y_predNNLL < ymax_plot)
                 ax.plot(theta[mask], y_predNNLL[mask], linestyle='--', label="Collinear NNLL", color='magenta')
+                
+                ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
                 
                 # Text inside plot instead of title
                 ax.text(0.05, 0.5, f"Q = {Qval} GeV", transform=ax.transAxes,

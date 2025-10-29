@@ -523,8 +523,8 @@ def dEEC(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, g
     def integrand(bT):
         bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
         Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
-        #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
-        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
+        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT**2)
+        #Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
         Gamma = Gamma_Pert * Gamma_NonP
         gamma_dot = np.dot(Gamma, fqg)
         return bT * j0(theta * bT * Q) * gamma_dot
@@ -651,16 +651,45 @@ def Gamma_tilde_cal_plt(gammainit, Qlst, bTlst,nlooplog):
     plt.show()
 
 def EEC_Compute_Aux(args):
+    factor = 2
+    nscan = 15
+    deltab = 0.0
+    nscanb = 1
     theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog = args
     z = (1 - np.cos(theta)) / 2
 
-    f = dEEC(theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog)
-    fz = 2 * theta / np.sin(theta) * f
+    # Central values
+    f_central = dEEC(theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog)
+    fz_central = 2 * theta / np.sin(theta) * f_central
 
+    # Scan ranges
+    gq_range = np.linspace(gq / factor, gq * factor, nscan)
+    gg_range = np.linspace(gg / factor, gg * factor, nscan)
+    bmax_range = np.linspace(bmax - deltab, bmax + deltab, nscanb)
+    
+    # Prepare storage
+    f_vals = np.empty((nscan, nscan, nscanb))
+    fz_vals = np.empty_like(f_vals)
+
+    # Triple scan: (gq, gg, bmax)
+    for i, gq_var in enumerate(gq_range):
+        for j, gg_var in enumerate(gg_range):
+            for k, bmax_var in enumerate(bmax_range):
+                f_tmp = dEEC(theta, Q, gammainit, bmax_var, gq_var, gg_var, fq, fg, nlooplog)
+                f_vals[i, j, k] = f_tmp
+                fz_vals[i, j, k] = 2 * theta / np.sin(theta) * f_tmp
+
+    # Compute envelope
+    fmin, fmax = np.min(f_vals), np.max(f_vals)
+    fzmin, fzmax = np.min(fz_vals), np.max(fz_vals)
+
+    return (theta, Q, f_central, z, fz_central, fmin, fmax, fzmin, fzmax)
+    '''
     fNLO = dEECNLO(theta, Q, gammainit, bmax, gq, gg, fq, fg, nlooplog)
     fzNLO = 2 * theta / np.sin(theta) * fNLO
 
     return (theta, Q, f, z, fz, fNLO, fzNLO)
+    '''
     
 def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     
@@ -681,7 +710,8 @@ def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     
     EEC = parallel_EEC(theta_lst, Q_lst, gammainit, bmax, gq, gg, fq, fg, nlooplog)
     
-    df = pd.DataFrame(EEC, columns=["theta", "Q", "dEEC","z","dEECz", "dEECNLO", "dEECzNLO"])
+    #df = pd.DataFrame(EEC, columns=["theta", "Q", "dEEC","z","dEECz", "dEECNLO", "dEECzNLO"])
+    df = pd.DataFrame(EEC, columns=["theta", "Q", "dEEC","z","dEECz", "dEECmin", "dEECmax", "dEECzmin", "dEECzmax"])
     df.to_csv("Output/dEECcal.csv", index=False)
     #'''
     df = pd.read_csv("Output/dEECcal.csv")
@@ -696,10 +726,12 @@ def dEEC_Res_cal_plt(theta_lst, Q_lst, gammainit,bmax,gq,gg,fq,fg,nlooplog):
     plt.plot(Q_lst[1]**2*df_Q2["z"], 1/Q_lst[1]**2 * df_Q2["dEEC"], color=colors[1],linestyle='-',label = f"Q={Q_lst[1]} GeV")
     plt.plot(Q_lst[2]**2*df_Q3["z"], 1/Q_lst[2]**2 * df_Q3["dEEC"], color=colors[2],linestyle='-',label = f"Q={Q_lst[2]} GeV")
 
+    '''
     plt.plot(Q_lst[0]**2*df_Q1["z"], 1/Q_lst[0]**2 * df_Q1["dEECNLO"], color=colors[0],linestyle='--', label = f"Q={Q_lst[0]} GeV (NLO)")
     plt.plot(Q_lst[1]**2*df_Q2["z"], 1/Q_lst[1]**2 * df_Q2["dEECNLO"], color=colors[1],linestyle='--', label = f"Q={Q_lst[1]} GeV (NLO)")
     plt.plot(Q_lst[2]**2*df_Q3["z"], 1/Q_lst[2]**2 * df_Q3["dEECNLO"], color=colors[2],linestyle='--', label = f"Q={Q_lst[2]} GeV (NLO)")
     #plt.xlim(0.002,50)
+    '''
     
     plt.xlabel(r"$z\bar{E}^2$")
     plt.ylabel(r"$dEEC/(dz\bar{E}^2)$")
@@ -756,7 +788,7 @@ def dEEC_cal_plt(zlst, Q_lst):
     fig, ax = plt.subplots()
     
     # Colors by Q value
-    scales = [100., 1.0, 0.01]
+    scales = [1000., 1.0, 0.001]
     colors = ['red', 'blue', 'green']
     Q_labels = [f"Q={Q} GeV" for Q in Q_lst]
 
@@ -782,17 +814,22 @@ def dEEC_cal_plt(zlst, Q_lst):
     ax.plot(df4_Q3["z"],scales[2]* df4_Q3["dEEC"], linestyle='-', color=colors[2])
 
     # TMD
-    ax.plot(df_Resum_Q1["z"],scales[0]* df_Resum_Q1["dEECz"], marker='o', linestyle='', color=colors[0], markersize = 7, markerfacecolor='none')
-    ax.plot(df_Resum_Q2["z"],scales[1]* df_Resum_Q2["dEECz"], marker='o', linestyle='', color=colors[1], markersize = 7, markerfacecolor='none')
-    ax.plot(df_Resum_Q3["z"],scales[2]* df_Resum_Q3["dEECz"], marker='o', linestyle='', color=colors[2], markersize = 7, markerfacecolor='none')
-
+    #'''
+    ax.plot(df_Resum_Q1["z"],scales[0]* df_Resum_Q1["dEECz"], marker='o', linestyle='', color=colors[0], markersize = 3, markerfacecolor='none')
+    ax.plot(df_Resum_Q2["z"],scales[1]* df_Resum_Q2["dEECz"], marker='o', linestyle='', color=colors[1], markersize = 3, markerfacecolor='none')
+    ax.plot(df_Resum_Q3["z"],scales[2]* df_Resum_Q3["dEECz"], marker='o', linestyle='', color=colors[2], markersize = 3, markerfacecolor='none')
+    #'''
+    
+    ax.fill_between(df_Resum_Q1["z"], scales[0] * df_Resum_Q1["dEECzmin"], scales[0] * df_Resum_Q1["dEECzmax"], color=colors[0], alpha=0.5, linewidth=1.0)
+    ax.fill_between(df_Resum_Q2["z"], scales[1] * df_Resum_Q2["dEECzmin"], scales[1] * df_Resum_Q2["dEECzmax"], color=colors[1], alpha=0.5, linewidth=1.0)
+    ax.fill_between(df_Resum_Q3["z"], scales[2] * df_Resum_Q3["dEECzmin"], scales[2] * df_Resum_Q3["dEECzmax"], color=colors[2], alpha=0.5, linewidth=1.0)
 
     def grouplegend(colors, linesty, markersty):
         
         group = (
-        (Line2D([0], [0], color=colors[0], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[0], marker=markersty, linestyle='None', markersize = 6, markerfacecolor='none')),
-        (Line2D([0], [0], color=colors[1], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[1], marker=markersty, linestyle='None', markersize = 6, markerfacecolor='none')),
-        (Line2D([0], [0], color=colors[2], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[2], marker=markersty, linestyle='None', markersize = 6, markerfacecolor='none'))
+        (Line2D([0], [0], color=colors[0], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[0], marker=markersty, linestyle='None', markersize = 3, markerfacecolor='none')),
+        (Line2D([0], [0], color=colors[1], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[1], marker=markersty, linestyle='None', markersize = 3, markerfacecolor='none')),
+        (Line2D([0], [0], color=colors[2], linestyle=linesty, linewidth=1), Line2D([0], [0], color=colors[2], marker=markersty, linestyle='None', markersize = 3, markerfacecolor='none'))
         )
         return group
     
@@ -808,9 +845,9 @@ def dEEC_cal_plt(zlst, Q_lst):
                             facecolor=facecolor, edgecolor=edgecolor, label=label)
         
     square_handles  = [
-    SmallSquare(facecolor=colors[0], edgecolor='white', label=fr'$\bar E$ = {Q_lst[0]} GeV'+rf'$(\times {scales[0]})$',size=4),
+    SmallSquare(facecolor=colors[0], edgecolor='white', label=fr'$\bar E$ = {Q_lst[0]} GeV'+rf'$ (\times 10^{3})$',size=4),
     SmallSquare(facecolor=colors[1], edgecolor='white', label=fr'$\bar E$ = {Q_lst[1]} GeV',size=4),
-    SmallSquare(facecolor=colors[2], edgecolor='white', label=fr'$\bar E$ = {Q_lst[2]} GeV'+rf'$(\times {scales[2]})$',size=4),
+    SmallSquare(facecolor=colors[2], edgecolor='white', label=fr'$\bar E$ = {Q_lst[2]} GeV'+rf'$ (\times 10^{{{-3}}})$',size=4),
     ]
     
     leg1 = ax.legend(
@@ -833,18 +870,18 @@ def dEEC_cal_plt(zlst, Q_lst):
     ax.add_artist(leg1)
     
     ax.set_xlabel("z",fontsize=13)
-    ax.set_ylabel(r"$dEEC/dz$",fontsize=13)
-    ax.set_title(r"$dEEC/dz$ vs z compared with the collinear ones",fontsize=14)
+    ax.set_ylabel(r"$\mathrm{d}\Sigma/(\sigma_0 \mathrm{d}z)$",fontsize=13)
+    ax.set_title(r"$\mathrm{d}\Sigma/(\sigma_0 \mathrm{d}z)$ vs z compared with the collinear ones",fontsize=14)
     ax.grid(True)
     ax.set_xscale("log")
     ax.set_yscale("log")
     
-    plt.savefig("Output/dEECcompare35.pdf",bbox_inches='tight')
+    plt.savefig("Output/dEECcompare.pdf",bbox_inches='tight')
 
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    #'''
+    '''
     Q1lst = np.array(GammaDF['Q'])
     
     def gammafit(gammaq,gammag):
@@ -860,7 +897,7 @@ if __name__ == '__main__':
                 +1/2 * GammaEvolstq + Aslst/(4*np.pi)* (131/12*GammaEvolstq-71/36*GammaEvolstg))
         
         return np.sum((np.array(GammaDF['f'])- GammaDF['f pred']) **2)
-    '''
+
     m = Minuit(gammafit, gammaq=0.5, gammag=0.5)  # initial guesses
     m.errordef = Minuit.LEAST_SQUARES  # 1 for least-squares cost
 
@@ -872,11 +909,11 @@ if __name__ == '__main__':
     # Print fit results
     print(m.values)   # best-fit parameters
     print(m.errors)  
-    '''
+
     gammainit = np.array([0.754,0.824])
     gammafit(0.754,0.824)
     Gamma_cal_plt(gammainit, Q1lst,1)
-    #'''
+    '''
     
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
@@ -886,27 +923,23 @@ if __name__ == '__main__':
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
     
-    '''
     gammainit=np.array([0.754,0.824])
-    theta_lst = 2*np.exp(np.linspace(np.log(10**(-4)), np.log(0.7), 30))
+    theta_lst = 2*np.exp(np.linspace(np.log(10**(-3.2)), np.log(10**(-0.4)), 50))
     Qlst = np.array([50.,100.,200.])
 
     #c = 0.346*0.5
     
     bmax = 1.5
-    gq = 1.1842
-    gg = 1.0
+    gq = 0.35
+    gg = 0.35
 
     fq = 1.0
     fg = 0.0
     nlooplog=1
     dEEC_Res_cal_plt(theta_lst, Qlst,gammainit,bmax,gq,gg,fq,fg,1)
-    '''
-    
-    
-    '''
-    zlst = np.exp(np.linspace(np.log(10**(-8)), np.log(0.5), 40))
+
+    zlst = np.exp(np.linspace(np.log(10**(-6.4)), np.log(10**(-0.8)), 40))
     Qlst = np.array([50.,100.,200.])
     dEEC_cal_plt(zlst,Qlst)
-    '''
+
  

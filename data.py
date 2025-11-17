@@ -1,5 +1,6 @@
 import numpy as np 
 import pandas as pd
+
 EECRawdataMAC = pd.read_csv("ee_EEC_data/Raw Data/MAC/Table1.csv", comment="#", header=0, names = ["theta","f","delta f plus","delta f minus"])
 EECRawdataMARKII = pd.read_csv("ee_EEC_data/Raw Data/MARKII/Table5.csv", comment="#", header=0, names = ["theta","theta minus", "theta plus","f","delta f stat plus","delta f stat minus", "delta f sys plus","delta f sys minus"])
 EECRawdataOPAL = pd.read_csv("ee_EEC_data/Raw Data/OPAL/Table2.csv", comment="#", header=0, names = ["theta","theta minus", "theta plus","f","delta f plus","delta f minus"])
@@ -103,3 +104,11 @@ EEC_Simulate['delta fz'] = 0.05*EEC_Simulate['fz']
 
 EEC_Simulate['f'] = EEC_Simulate['fz'] * np.sin(EEC_Simulate['theta'])/2
 EEC_Simulate['delta f'] = 0.05* EEC_Simulate['f']
+
+EECAlephNew = pd.read_csv("ee_EEC_data/Raw Data/Aleph/alephEEC.csv", header=0, names = ["z","fz", "delta fz sys", "delta fz stat"])
+
+EECAlephNew['theta'] = invert_z(EECAlephNew['z'])
+EECAlephNew['delta fz'] =  np.sqrt(EECAlephNew['delta fz sys'] ** 2 + EECAlephNew['delta fz stat'] ** 2)
+EECAlephNew['f'] = EECAlephNew['fz'] * np.sin(EECAlephNew['theta'])/2
+EECAlephNew['delta f'] = EECAlephNew['delta fz'] * np.sin(EECAlephNew['theta'])/2
+EECAlephNew['Q']=91.2

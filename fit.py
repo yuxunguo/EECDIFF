@@ -1,5 +1,5 @@
 from dEECtheo import dEEC, tot_xsec_sum, dEECimprov, dEEC_NNLL_resum, dEEC_fixed_order
-from data import EEC_merged, EEC_Simulate
+from data import EEC_merged, EEC_Simulate, EECAlephNew
 import numpy as np 
 import pandas as pd
 from iminuit import Minuit
@@ -9,19 +9,32 @@ import os, time
 from matplotlib import rcParams
 from matplotlib.ticker import MaxNLocator, LogLocator
 
-EECdata1 = EEC_merged[(EEC_merged['z']<0.2) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
-
-EECdata1.loc[:,"f raw"]=EECdata1["f"]/2
-EECdata1.loc[:,"delta f raw"]=EECdata1["delta f"]/2
-EECdata1["f"] = EECdata1["f raw"] / EECdata1["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
-EECdata1["delta f"] = EECdata1["delta f raw"] / EECdata1["Q"].apply(lambda q: tot_xsec_sum(q, 3, 5))
-
-EECdata1["fz"] = 2/np.sin(EECdata1["theta"]) * EECdata1["f"]
-EECdata1["delta fz"] = 2/np.sin(EECdata1["theta"]) * EECdata1["delta f"]
-
+EECdata1 = EEC_merged[(EEC_merged['theta']<0.3) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
 EECdata2 = EEC_Simulate[EEC_Simulate['theta']<0.3].copy().reset_index(drop=True)
+EECdata3= EECAlephNew[EECAlephNew['theta']<0.3].copy().reset_index(drop=True)
 
-EECdata = EECdata2
+
+def normalize_EEC(EECdata, tot_xsec_sum_func, nloop=3, nf=5, aux=1):
+    
+    EECdata = EECdata.copy()  # avoid modifying original DataFrame
+
+    # Save raw columns
+    EECdata["f raw"] = EECdata["f"] /aux
+    EECdata["delta f raw"] = EECdata["delta f"] /aux
+
+    # Normalize f and delta f
+    EECdata["f"] = EECdata["f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum_func(q, nloop, nf))
+    EECdata["delta f"] = EECdata["delta f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum_func(q, nloop, nf))
+
+    # Compute fz and delta fz
+    EECdata["fz"] = 2 / np.sin(EECdata["theta"]) * EECdata["f"]
+    EECdata["delta fz"] = 2 / np.sin(EECdata["theta"]) * EECdata["delta f"]
+
+    return EECdata
+
+EECdata1 = normalize_EEC(EECdata1, tot_xsec_sum, nloop=3, nf=5)
+EECdata2 = normalize_EEC(EECdata2, tot_xsec_sum, nloop=3, nf=5)
+EECdata3 = normalize_EEC(EECdata3, tot_xsec_sum, nloop=3, nf=5)
 
 Export_Mode = 0
 
@@ -82,7 +95,7 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     nloop_log = 1
     
     tasks = [
-        (theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, gq)
+        (theta, Q, muOverE, gamma_init, bmax, gq, gq, fq, fg, nloop_log, MU0, gq)
         for theta, Q in zip(EECdata['theta'], EECdata['Q'])
     ]
 
@@ -228,6 +241,124 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                     dpi=300, bbox_inches='tight')
         plt.close(fig)
 
+def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA", Note=["","","","","",""]):
+
+    # Global font settings
+    rcParams.update({
+        'font.size': 12,
+        'axes.labelsize': 12,
+        'ytick.labelsize': 11,
+        'xtick.labelsize': 11,
+        'legend.fontsize': 11,
+        'lines.linewidth': 2,
+        'lines.markersize': 3,
+    })
+
+    os.makedirs("Output", exist_ok=True)
+
+    PlotDF = PlotDF.sort_values(by='theta')
+    groups = list(PlotDF.groupby('Q'))
+    n_plots = len(groups)
+
+    ncols = 2
+    nrows = 3
+    n_per_figure = nrows * ncols
+
+    for fig_idx in range(0, n_plots, n_per_figure):
+        n_plots_remaining = min(n_per_figure, n_plots - fig_idx)
+        nrows_eff = int(np.ceil(n_plots_remaining / ncols))
+
+        # Shared x-axis and tight vertical layout
+        fig, axes = plt.subplots(
+            nrows_eff, ncols, 
+            figsize=(3.0 * ncols, 2.5 * nrows_eff),
+            sharex='col',  # share x-axis only within each column
+            gridspec_kw={'hspace': 0.0, 'wspace': 0.0}
+        )
+        axes = np.array(axes).reshape(nrows_eff, ncols)
+        
+        ax_idx = 0
+        for row in range(nrows_eff):
+            for col in range(ncols):
+
+    
+                Qval, group = groups[fig_idx + ax_idx]
+                notefig  = Note[fig_idx + ax_idx]
+                group = group[group['theta'] > 0]
+                ax = axes[row, col]
+
+                # --- Prepare scaled data ---
+                theta = group['theta']
+                inv_theta = 1 / theta
+
+                y_f = inv_theta * group['f']
+                y_err = inv_theta * group['delta f']
+                y_pred = inv_theta * group['pred']
+                y_predNNLL = inv_theta * group['predNNLL']
+                y_predNLO = inv_theta * group['predNLO']
+                # --- Compute y-limits based on the first two datasets only (ignoring NaNs or <=0 values) ---
+                y_ref = np.concatenate([y_f[y_f > 0], y_pred[y_pred > 0]])
+                ymin_plot, ymax_plot = np.nanmin(y_ref), np.nanmax(y_ref)
+
+                # Add a reasonable margin in log space (e.g., ±0.3 dex)
+                log_margin = 0.3
+                ymin_plot /= 10**log_margin
+                ymax_plot *= 10**log_margin
+
+                # --- Plot the first two normally ---
+                ax.errorbar(theta, y_f, yerr=y_err, fmt='o', capsize=3, markersize=3,
+                            label=datalabel, alpha=0.6)
+                ax.plot(theta, y_pred, label="Theory Fit",color='red')
+
+                # --- Truncate divergent NNLL curve before plotting ---
+                mask = (y_predNNLL > ymin_plot) & (y_predNNLL < ymax_plot)
+                ax.plot(theta[mask], y_predNNLL[mask], linestyle='--', label="Collinear NNLL", color='magenta')
+                
+                #ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
+                
+                # Text inside plot instead of title
+                ax.text(0.05, 0.55, f"Q = {Qval} GeV\n{notefig}", transform=ax.transAxes,
+                        fontsize=12, fontweight='bold', ha='left', va='top')
+                
+                ax.set_yscale("log")
+                ax.set_xscale("log")
+                ax.set_ylim(ymin_plot, ymax_plot)
+
+
+                col_idx = col
+                
+                if col_idx == 0:  # left-most column
+                    ax.yaxis.set_ticks_position('left')
+                elif col_idx == ncols - 1:  # right-most column
+                    ax.yaxis.set_ticks_position('right')
+                else:  # middle columns
+                    ax.yaxis.set_ticks_position('none')  # or 'left' if you prefer
+            
+                # Only hide x-axis labels for top rows, show for bottom row
+                if row < nrows_eff - 1:
+                    ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                    ax.set_xlabel("")
+                else:
+                    ax.set_xlabel(r"$\frac{dEEC}{\theta d\theta}$ v.s. $\theta$")
+                    ax.tick_params(axis='x', which='both', bottom=True, top=True, labelbottom=True)
+                    #ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
+
+                # Reorder legend handles explicitly
+                handles, labels = ax.get_legend_handles_labels()
+                # Ensure "Theory Fit" first, "PYTHIA" second
+                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Theory Fit")]
+                ax.legend([handles[i] for i in order], [labels[i] for i in order],
+                        frameon=False, loc="best", fontsize=12)
+                
+                ax.grid(True, which="both", ls="--", alpha=0.5)
+                
+                ax_idx += 1
+
+        plt.tight_layout(pad=0.5)
+        plt.savefig(f"Output/{filename}",
+                    dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        
 if __name__ == '__main__':
     pool = Pool()
     init_params = {
@@ -276,7 +407,7 @@ if __name__ == '__main__':
                     "muOverE",
                     "bmax",
                     #"gq",
-                    #"gg",
+                    "gg",
                     "fq","fg",
                     "MU0",
                     "Lambda",
@@ -323,14 +454,21 @@ if __name__ == '__main__':
         
     best_fit_params = m.values.to_dict()
     
-    best_fit_params["norm"] = 0.5
+    best_fit_params["norm"] = 1.0
     Export_Mode = 1
     Export_Filename = 'Results_improv_Exp.csv'
     EECdata = EECdata1
     #TestDF = cost_EEC(**best_fit_params)
     TestDF = cost_EECimprov(**best_fit_params)
     
-    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Exp.pdf", datalabel="Experiment")
+    best_fit_params["norm"] = 4/9*0.5/1.15
+    Export_Mode = 1
+    Export_Filename = 'Results_improv_Exp2.csv'
+    EECdata = EECdata3
+    #TestDF = cost_EEC(**best_fit_params)
+    TestDF2 = cost_EECimprov(**best_fit_params)
+    note = ["TASSO","TASSO","TOPAZ","TOPAZ","ALEPH (Note)","OPAL"]
+    plot_EEC_by_theta_exp(pd.concat([TestDF, TestDF2]), filename="Fit_EEC_Exp_Comb.pdf", datalabel="Experiment", Note=note)
     
     best_fit_params["norm"] = 0.407
     Export_Mode = 1

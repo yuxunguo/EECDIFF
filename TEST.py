@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
 from dEECtheo import dEECimprov
-
+'''
 Q=100
 Gammaq= 0.754
 Gammag= 0.824
@@ -23,3 +23,16 @@ def f(theta):
 result, error = quad(f, 0, np.pi)
 print("Integral =", result)
 print("Estimated error =", error)
+'''
+data = np.loadtxt("ee_EEC_data/Simulation/EEC_ee_91.2GeV.txt", comments="#")
+
+print(data)
+# Split into z and EEC columns
+z = data[:, 0]
+EEC = data[:, 1]
+#'''
+# Integrate EEC over z from 0 to 1 using the trapezoidal rule
+integral = np.trapz(EEC, z)
+
+print(f"Integral of EEC from z=0 to 1: {integral:.6e}")
+#'''

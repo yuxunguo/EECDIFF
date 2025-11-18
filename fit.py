@@ -10,7 +10,7 @@ from matplotlib import rcParams
 from matplotlib.ticker import MaxNLocator, LogLocator
 
 EECdata1 = EEC_merged[(EEC_merged['theta']<0.3) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
-EECdata2 = EEC_Simulate[EEC_Simulate['theta']<0.3].copy().reset_index(drop=True)
+EECdata2 = EEC_Simulate[(EEC_Simulate['theta']<0.3) & (EEC_Simulate['Q']>30.)].copy().reset_index(drop=True)
 EECdata3= EECAlephNew[EECAlephNew['theta']<0.3].copy().reset_index(drop=True)
 
 
@@ -141,7 +141,7 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
     n_plots = len(groups)
 
     ncols = 2
-    nrows = 3
+    nrows = 2
     n_per_figure = nrows * ncols
 
     for fig_idx in range(0, n_plots, n_per_figure):
@@ -160,11 +160,11 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
         ax_idx = 0
         for row in range(nrows_eff):
             for col in range(ncols):
-
+                '''
                 if col == ncols - 1 and row < n_per_figure - n_plots:
                     axes[row, col].axis('off')
                     continue
-                
+                '''
                 Qval, group = groups[fig_idx + ax_idx]
                 group = group[group['theta'] > 0]
                 ax = axes[row, col]
@@ -190,13 +190,13 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 # --- Plot the first two normally ---
                 ax.errorbar(theta, y_f, yerr=y_err, fmt='o', capsize=3, markersize=3,
                             label=datalabel, alpha=0.6)
-                ax.plot(theta, y_pred, label="Theory Fit",color='red')
+                ax.plot(theta, y_pred, label="Resummed EEC Fit",color='red')
 
                 # --- Truncate divergent NNLL curve before plotting ---
                 mask = (y_predNNLL > ymin_plot) & (y_predNNLL < ymax_plot)
                 ax.plot(theta[mask], y_predNNLL[mask], linestyle='--', label="Collinear NNLL", color='magenta')
                 
-                ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
+                #ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
                 
                 # Text inside plot instead of title
                 ax.text(0.05, 0.5, f"Q = {Qval} GeV", transform=ax.transAxes,
@@ -228,7 +228,7 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 # Reorder legend handles explicitly
                 handles, labels = ax.get_legend_handles_labels()
                 # Ensure "Theory Fit" first, "PYTHIA" second
-                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Theory Fit")]
+                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Resummed EEC Fit")]
                 ax.legend([handles[i] for i in order], [labels[i] for i in order],
                         frameon=False, loc="best", fontsize=12)
                 
@@ -271,7 +271,7 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
         # Shared x-axis and tight vertical layout
         fig, axes = plt.subplots(
             nrows_eff, ncols, 
-            figsize=(3.0 * ncols, 2.5 * nrows_eff),
+            figsize=(3.2 * ncols, 2.5 * nrows_eff),
             sharex='col',  # share x-axis only within each column
             gridspec_kw={'hspace': 0.0, 'wspace': 0.0}
         )
@@ -308,7 +308,7 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 # --- Plot the first two normally ---
                 ax.errorbar(theta, y_f, yerr=y_err, fmt='o', capsize=3, markersize=3,
                             label=datalabel, alpha=0.6)
-                ax.plot(theta, y_pred, label="Theory Fit",color='red')
+                ax.plot(theta, y_pred, label="Resummed EEC Fit",color='red')
 
                 # --- Truncate divergent NNLL curve before plotting ---
                 mask = (y_predNNLL > ymin_plot) & (y_predNNLL < ymax_plot)
@@ -346,7 +346,7 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 # Reorder legend handles explicitly
                 handles, labels = ax.get_legend_handles_labels()
                 # Ensure "Theory Fit" first, "PYTHIA" second
-                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Theory Fit")]
+                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Resummed EEC Fit")]
                 ax.legend([handles[i] for i in order], [labels[i] for i in order],
                         frameon=False, loc="best", fontsize=12)
                 

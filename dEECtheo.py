@@ -1105,7 +1105,7 @@ def GammaQ_plt(qTC,qTnp, Qlst):
     Qvals, GqC, GgC = compute_gamma_curve(qTC)
     Qvals, GqNP, GgNP = compute_gamma_curve(qTnp)
     
-    plt.figure(figsize=(7,5))
+    plt.figure(figsize=(4.5,4))
     #'''
     # Reference curves
     plt.plot(Qvals, np.array(ref3qlst)/ref3qlst[0],
@@ -1115,19 +1115,19 @@ def GammaQ_plt(qTC,qTnp, Qlst):
     #'''
     # Calculated curves with markers
     plt.plot(Qvals, GqC/GqC[0],
-            label=f"qT = {qTC} GeV",
+            label=fr"dEEC at $q_T$ = {qTC} GeV",
             linestyle='', marker='o', markersize=4,
             markerfacecolor='none', markeredgecolor='C0')
     plt.plot(Qvals, GqNP/GqNP[0],
-            label=f"qT = {qTnp} GeV",
+            label=fr"dEEC at $q_T$ = {qTnp} GeV",
             linestyle='', marker='*', markersize=6,
             markerfacecolor='none', markeredgecolor='C1')
 
     plt.xscale("log")
     plt.yscale("log")
-    plt.xlabel("Q [GeV]")
-    plt.ylabel(r"$\Gamma(Q)$")
-    plt.title(f"Gamma vs Q")
+    plt.xlabel(r"$\mu$ [GeV]")
+    plt.ylabel(r"$\Gamma(\mu,q_T)$")
+    plt.title(f"Normalized jet functions $\Gamma(\mu,q_T)$ vs $\mu$")
     plt.legend()
     plt.tight_layout()
     plt.savefig("Output/Gamma_Q.pdf", bbox_inches='tight')
@@ -1143,7 +1143,7 @@ if __name__ == '__main__':
     Gamma_cal_plt(GammaDF, dfGamma_theo)
     '''
     
-    Qlst= np.exp(np.linspace(np.log(20), np.log(600), 15))
+    Qlst= np.exp(np.linspace(np.log(50), np.log(1000), 15))
     
     #qT = np.exp(np.linspace(np.log(10**(-6)), np.log(10**2), 50))
     #Gamma_qT_Q_plt(qT, Qlst)

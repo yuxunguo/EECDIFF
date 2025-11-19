@@ -17,6 +17,7 @@ from functools import cache, lru_cache
 from scipy.integrate import quad, quad_vec
 from multiprocessing import Pool
 import matplotlib.ticker as ticker
+from itertools import product
 
 NC = 3
 CF = (NC**2 - 1) / (2 * NC)
@@ -477,7 +478,8 @@ def GammaRes_NLO(Q: float, bT: float, Gammaq: float, Gammag: float, bmax: float,
 
 def dEECNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int):
     
-    fqg=np.array([fq,fg])
+    #fqg=np.array([fq,fg])
+    fqg = np.array([1, 1])
     Gammaq = Gamma_Init[0]
     Gammag = Gamma_Init[1]
     
@@ -532,6 +534,30 @@ def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonp
 
     return Iq * Q**2, Ig * Q**2
 
+def dEECimprovNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonpert: float, nlooplog: int, MU0: float):
+    
+    def integrand(x):
+        gamma0q, gamma0g = GammaImprov(theta, Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0)
+        gammaxq, gammaxg = GammaImprov(x * theta, Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0) 
+        
+        AS = AlphaS(3,5,Q)/(2*np.pi)
+
+        integrandq = (5* gamma0q * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^4 dx from 0 to 1= 1/5. A factor of 3 for normalization
+                    +CF * AS * gammaxq * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
+                    +CF * AS * np.log(1-x)/(1-x) * ((1+x**2)*gammaxq - 2*gamma0q)
+                    -3/2 * CF * AS * 1/(1-x) * (gammaxq - gamma0q))
+        
+        integrandg = CF * AS * (1+(1-x)**2)/x *np.log(x**2*(1-x)) * gammaxg
+        
+        return np.array([integrandq, integrandg])* x**4/2
+    
+    dEEC, _ = quad_vec(integrand,0,1)
+    
+    return dEEC[0]+dEEC[1]
+
+def dEECimprovSim(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonpert: float, nlooplog: int, MU0: float):
+    return dEECimprov(theta, Q ,Gamma_Init, bmax, Gnonpert,Gnonpert,1,0,nlooplog,MU0,Gnonpert)
+    
 def dEECimprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, fq: float, fg:float,nlooplog: int, MU0: float, Lambda: float):
     
     hqhg = HqHg(Q,nlooplog)
@@ -1069,6 +1095,46 @@ def Gamma_qT_Q_plt(qT, Qlst):
     plt.tight_layout()
     plt.savefig("Output/Gamma_thetaQ.pdf", bbox_inches='tight')
 
+def Gamma_qT_Q_CalcCsv(qT, Qlst):
+    Gammainit = np.array([0.754,0.824])
+    bmax = 1.5
+    Gnonpert = 3.75
+    nlooplog=1
+    mu0= 20
+
+    def compute_gamma_curve(Q):
+        theta = qT / Q
+        thetaQ = qT  # = qT
+
+        Gq_vals = []
+        Gg_vals = []
+        for th in theta:
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, mu0)
+            Gq_vals.append(Iq)
+            Gg_vals.append(Ig)
+
+        return thetaQ, np.array(Gq_vals), np.array(Gg_vals)
+
+    # --------------------------
+    # Collect all data here
+    # --------------------------
+    rows = []
+
+    for Q in Qlst:
+        thetaQ, Gq, Gg = compute_gamma_curve(Q)
+        for qT_val, gq_val, gg_val in zip(thetaQ, Gq, Gg):
+            rows.append({
+                "Q": Q,
+                "qT": qT_val,
+                "gamma_q": gq_val,
+                "gamma_g": gg_val
+            })
+
+    df = pd.DataFrame(rows)
+
+    # Save to CSV
+    df.to_csv("Output/Gamma_thetaQ_data.csv", index=False)
+
 def GammaQ_plt(qTC,qTnp, Qlst):
     
     Gammainit = np.array([0.754,0.824])
@@ -1105,33 +1171,112 @@ def GammaQ_plt(qTC,qTnp, Qlst):
     Qvals, GqC, GgC = compute_gamma_curve(qTC)
     Qvals, GqNP, GgNP = compute_gamma_curve(qTnp)
     
-    plt.figure(figsize=(4.5,4))
-    #'''
-    # Reference curves
-    plt.plot(Qvals, np.array(ref3qlst)/ref3qlst[0],
-            label=fr"Ref: $\gamma^3$ scaling", linestyle='-')
-    plt.plot(Qvals, np.array(ref5qlst)/ref5qlst[0],
-            label=fr"Ref: $\gamma^5$ scaling", linestyle='--')
-    #'''
+    plt.figure(figsize=(5.5,4))
+
     # Calculated curves with markers
     plt.plot(Qvals, GqC/GqC[0],
-            label=fr"dEEC at $q_T$ = {qTC} GeV",
-            linestyle='', marker='o', markersize=4,
-            markerfacecolor='none', markeredgecolor='C0')
+            label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTC} GeV)",
+            linestyle='', marker='o', markersize=4, 
+            markerfacecolor='none', markeredgecolor='red')
     plt.plot(Qvals, GqNP/GqNP[0],
-            label=fr"dEEC at $q_T$ = {qTnp} GeV",
+            label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTnp} GeV)",
             linestyle='', marker='*', markersize=6,
-            markerfacecolor='none', markeredgecolor='C1')
+            markerfacecolor='none', markeredgecolor='magenta')
+    
+    # Reference curves
+    plt.plot(Qvals, np.array(ref3qlst)/ref3qlst[0],
+            label=fr"Reference: $\gamma^3$-scaling", linestyle='-', color = 'red')
+    plt.plot(Qvals, np.array(ref5qlst)/ref5qlst[0],
+            label=fr"Reference: $\gamma^5$-scaling", linestyle='--', color = 'magenta')
 
     plt.xscale("log")
-    plt.yscale("log")
+    #plt.yscale("log")
     plt.xlabel(r"$\mu$ [GeV]")
-    plt.ylabel(r"$\Gamma(\mu,q_T)$")
-    plt.title(f"Normalized jet functions $\Gamma(\mu,q_T)$ vs $\mu$")
-    plt.legend()
+    plt.ylabel(fr"$\mu^{{-2}}\Gamma(\mu,q_T)$")
+    plt.title(fr"Improved and normalized jet functions $\mu^{{-2}}\Gamma(\mu,q_T)$ vs $\mu$")
+    plt.legend(markerscale=1,handlelength=1.35)
     plt.tight_layout()
-    plt.savefig("Output/Gamma_Q.pdf", bbox_inches='tight')
+    plt.savefig("Output/Gamma_muscale.pdf", bbox_inches='tight')
 
+
+def dEECimprovSim_helper(args):
+    qT, Q = args
+    theta = qT/Q
+    
+    Gammainit = np.array([0.754,0.824])
+    bmax = 1.5
+    Gnonpert = 3.75
+    nlooplog=1
+    MU0= 20
+    
+    return dEECimprovSim(theta, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
+
+def dEECimprovNLO_helper(args):
+    qT, Q = args
+    theta = qT/Q
+    
+    Gammainit = np.array([0.754,0.824])
+    bmax = 1.5
+    Gnonpert = 3.75
+    nlooplog=1
+    MU0= 20
+    
+    return dEECimprovNLO(theta, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
+
+def dEEC_qT_Q_Cal(qT_list, Q_list):
+    
+    all_args = list(product(qT_list, Q_list))
+    
+    with Pool() as pool:
+        sim_results = pool.map(dEECimprovSim_helper, all_args)
+        nlo_results = pool.map(dEECimprovNLO_helper, all_args)
+
+    # Create DataFrame
+    df = pd.DataFrame({
+        "qT": [arg[0] for arg in all_args],
+        "Q": [arg[1] for arg in all_args],
+        "dEECimprovSim": sim_results,
+        "dEECimprovNLO": nlo_results
+    })
+
+    # Save to CSV
+    df.to_csv("Output/dEECNLO_results.csv", index=False)
+ 
+
+def dEEC_qT_Q_plt():
+    
+    df = pd.read_csv("Output/dEECNLO_results.csv")
+    
+    # Get unique Q values and sort them
+    Q_values = sorted(df['Q'].unique())
+    
+    # Create a figure
+    plt.figure(figsize=(5.25,4))
+    
+    # Define a color map
+    colors = ['#1f77b4', '#ff7f0e', '#d62728', '#9467bd']
+    
+    # Loop over Q values
+    for i, Q in enumerate(Q_values):
+        
+        dfQ = df[df['Q'] == Q].sort_values('qT')
+        
+        # Plot dEECimprovSim as solid line
+        plt.plot(dfQ['qT'],1/Q**2 * dfQ['dEECimprovSim'], color=colors[i], label=f'Improved LLA            (Q={Q} GeV)', linestyle='-')
+        
+        # Plot dEECimprovNLO as dashed line
+        plt.plot(dfQ['qT'],1/Q**2 * dfQ['dEECimprovNLO'], color=colors[i], label=f'Improved LLA + NLO (Q={Q} GeV)', linestyle='--')
+    
+    plt.xscale('log') 
+    plt.xlabel(r'$q_T$ [GeV]')
+    plt.ylabel(r'$\mathrm{d}\Sigma/\mathrm{d}^2q_T$')
+    plt.title(r'Improved EEC $\mathrm{d}\Sigma/\mathrm{d}^2q_T$ vs $q_T$ for different Q values')
+    plt.legend(handlelength=1.35)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("Output/dEEC_thetaQ.pdf", bbox_inches='tight')
+
+ 
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
@@ -1143,11 +1288,16 @@ if __name__ == '__main__':
     Gamma_cal_plt(GammaDF, dfGamma_theo)
     '''
     
-    Qlst= np.exp(np.linspace(np.log(50), np.log(1000), 15))
+    Qlst= np.array([50.,100., 200.])
     
-    #qT = np.exp(np.linspace(np.log(10**(-6)), np.log(10**2), 50))
+    qT = np.exp(np.linspace(np.log(10**(-3)), np.log(20), 50))
+    
+    #dEEC_qT_Q_Cal(qT, Qlst)
+    dEEC_qT_Q_plt()
+    
     #Gamma_qT_Q_plt(qT, Qlst)
-    GammaQ_plt(20,1,Qlst)
+    #Gamma_qT_Q_CalcCsv(qT, Qlst)
+    #GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
     gammainit = np.array([0.7,0.7])

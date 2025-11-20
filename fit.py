@@ -23,8 +23,8 @@ def normalize_EEC(EECdata, tot_xsec_sum_func, nloop=3, nf=5, aux=1):
     EECdata["delta f raw"] = EECdata["delta f"] /aux
 
     # Normalize f and delta f
-    EECdata["f"] = EECdata["f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum_func(q, nloop, nf))
-    EECdata["delta f"] = EECdata["delta f raw"] / EECdata["Q"].apply(lambda q: tot_xsec_sum_func(q, nloop, nf))
+    EECdata["f"] = EECdata["f raw"] #/ EECdata["Q"].apply(lambda q: tot_xsec_sum_func(q, nloop, nf))
+    EECdata["delta f"] = EECdata["delta f raw"] #/ EECdata["Q"].apply(lambda q: tot_xsec_sum_func(q, nloop, nf))
 
     # Compute fz and delta fz
     EECdata["fz"] = 2 / np.sin(EECdata["theta"]) * EECdata["f"]

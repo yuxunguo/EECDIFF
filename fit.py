@@ -1,4 +1,4 @@
-from dEECtheo import dEEC, tot_xsec_sum, dEECimprov, dEEC_NNLL_resum, dEEC_fixed_order
+from dEECtheo import dEEC, tot_xsec_sum, dEECimprov, dEECimprovNLO, dEEC_NNLL_resum, dEEC_fixed_order
 from data import EEC_merged, EEC_Simulate, EECAlephNew
 import numpy as np 
 import pandas as pd
@@ -9,10 +9,29 @@ import os, time
 from matplotlib import rcParams
 from matplotlib.ticker import MaxNLocator, LogLocator
 
-EECdata1 = EEC_merged[(EEC_merged['theta']<0.3) & (EEC_merged['Q']>30.)].copy().reset_index(drop=True)
+EECdata1 = EEC_merged[(EEC_merged['theta']<0.3) & (EEC_merged['Q']>30.) & (EEC_merged['Q']*EEC_merged['theta']<40)].copy().reset_index(drop=True)
 EECdata2 = EEC_Simulate[(EEC_Simulate['theta']<0.3) & (EEC_Simulate['Q']>30.)].copy().reset_index(drop=True)
 EECdata3= EECAlephNew[EECAlephNew['theta']<0.3].copy().reset_index(drop=True)
 
+def downsample_group(df, n=30):
+    """Return ~n evenly spaced points from df."""
+    if len(df) <= n:
+        return df  # no need to downsample
+    idx = np.linspace(0, len(df) - 1, n, dtype=int)
+    return df.iloc[idx]
+
+# Apply to each Q
+EECdata2 = (
+    EECdata2
+    .groupby("Q", group_keys=False)
+    .apply(lambda df: downsample_group(df, n=15))
+)
+
+EECdata2.reset_index(drop=True, inplace=True)
+
+EECdata = EECdata2
+
+Fit_Counter = 0
 
 def normalize_EEC(EECdata, tot_xsec_sum_func, nloop=3, nf=5, aux=1):
     
@@ -76,32 +95,43 @@ def cost_EEC(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
 '''
 
 def compute_EECimprov(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, Lambda):
+
     z = (1 - np.cos(theta)) / 2
+    
     f = theta * dEECimprov(theta, muOverE/2 * Q, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, Lambda)
     dEECz = 2 / np.sin(theta) * f
+    
+    fimprvnlo = theta * dEECimprovNLO(theta, muOverE/2 * Q, gamma_init, bmax, gq, nloop_log, MU0)
+    dEECzimprvnlo = 2 / np.sin(theta) * fimprvnlo
+    
     dEECzNNLL = dEEC_NNLL_resum(z, muOverE/2 * Q, 3, 5)
     fNNLL = dEECzNNLL * np.sin(theta)/2
     
-    dEECzNLO = dEEC_fixed_order(z, muOverE/2 * Q, 3, 5,2)
+    dEECzNLO = dEEC_fixed_order(z, muOverE/2 * Q, 3, 5, 2)
     fNLO = dEECzNLO * np.sin(theta)/2
-
-    return (theta, Q, f, z, dEECz, fNNLL, dEECzNNLL, fNLO, dEECzNLO)
-
+    
+    return (theta, Q, f, z, dEECz, fNNLL, dEECzNNLL, fNLO, dEECzNLO, fimprvnlo, dEECzimprvnlo)
 
 def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
-             gq: float, gg: float, fq: float, fg: float, norm: float, MU0, Lambda) -> float:
+             gnonpert: float, fq: float, fg: float, norm: float, MU0) -> float:
     """Compute the chi-squared cost function for EEC data."""
+    
+    global Fit_Counter
+    print(Fit_Counter)
+    Fit_Counter +=1
+    
     gamma_init = np.array([Gammaq, Gammag])
     nloop_log = 1
     
     tasks = [
-        (theta, Q, muOverE, gamma_init, bmax, gq, gq, fq, fg, nloop_log, MU0, gq)
+        (theta, Q, muOverE, gamma_init, bmax, gnonpert, gnonpert, fq, fg, nloop_log, MU0, gnonpert)
         for theta, Q in zip(EECdata['theta'], EECdata['Q'])
     ]
 
     EEC_rows = pool.starmap(compute_EECimprov, tasks)
     
-    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL", "dEECNLO","dEECzNLO"])
+    print('=========================================================')
+    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL", "dEECNLO","dEECzNLO", "dEECimprvnlo","dEECzimprvnlo"])
     
     EECdataFit = EECdata.copy()
     # Match predictions to EECdata and compute chi-squared
@@ -110,10 +140,14 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     
     EECdataFit['predNNLL'] = norm*pred_df['dEECNNLL'].values
     EECdataFit['predzNNLL'] = norm*pred_df['dEECzNNLL'].values
+    
     EECdataFit['predNLO'] = norm*pred_df['dEECNLO'].values
     EECdataFit['predzNLO'] = norm*pred_df['dEECzNLO'].values
     
-    EECdataFit['cost'] = ((EECdataFit['pred'] - EECdataFit['f']) / EECdataFit['delta f'])**2
+    EECdataFit['predimprvnlo'] = norm*pred_df['dEECimprvnlo'].values
+    EECdataFit['predzimprvnlo'] = norm*pred_df['dEECzimprvnlo'].values
+    
+    EECdataFit['cost'] = ((EECdataFit['predimprvnlo'] - EECdataFit['f']) / EECdataFit['delta f'])**2
 
     if(Export_Mode == 1):
         EECdataFit.to_csv(f'Output/{Export_Filename}', index=False)
@@ -175,9 +209,10 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
 
                 y_f = inv_theta * group['f']
                 y_err = inv_theta * group['delta f']
-                y_pred = inv_theta * group['pred']
+                y_pred = inv_theta * group['predimprvnlo']
+                y_predimp = inv_theta * group['pred']
                 y_predNNLL = inv_theta * group['predNNLL']
-                y_predNLO = inv_theta * group['predNLO']
+
                 # --- Compute y-limits based on the first two datasets only (ignoring NaNs or <=0 values) ---
                 y_ref = np.concatenate([y_f[y_f > 0], y_pred[y_pred > 0]])
                 ymin_plot, ymax_plot = np.nanmin(y_ref), np.nanmax(y_ref)
@@ -188,9 +223,11 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 ymax_plot *= 10**log_margin
 
                 # --- Plot the first two normally ---
-                ax.errorbar(theta, y_f, yerr=y_err, fmt='o', capsize=3, markersize=3,
-                            label=datalabel, alpha=0.6)
-                ax.plot(theta, y_pred, label="Resummed EEC Fit",color='red')
+                
+                ax.plot(theta, y_f, '*', markersize=8, label=datalabel, alpha=1.0)
+                
+                ax.plot(theta, y_pred, label="Imprv. LLA+NLO",color='red', linestyle='-')
+                ax.plot(theta, y_predimp, label="Imprv. LLA",color='red', linestyle=':')
 
                 # --- Truncate divergent NNLL curve before plotting ---
                 mask = (y_predNNLL > ymin_plot) & (y_predNNLL < ymax_plot)
@@ -199,7 +236,7 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 #ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
                 
                 # Text inside plot instead of title
-                ax.text(0.05, 0.5, f"Q = {Qval} GeV", transform=ax.transAxes,
+                ax.text(0.05, 0.57, f"Q = {Qval} GeV", transform=ax.transAxes,
                         fontsize=12, fontweight='bold', ha='left', va='top')
                 
                 ax.set_yscale("log")
@@ -228,9 +265,9 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 # Reorder legend handles explicitly
                 handles, labels = ax.get_legend_handles_labels()
                 # Ensure "Theory Fit" first, "PYTHIA" second
-                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Resummed EEC Fit")]
+                order = [labels.index(datalabel),labels.index("Imprv. LLA+NLO"),labels.index("Imprv. LLA"), labels.index("Collinear NNLL")]
                 ax.legend([handles[i] for i in order], [labels[i] for i in order],
-                        frameon=False, loc="best", fontsize=12)
+                        frameon=False, loc="best", fontsize=11, handlelength=1.45)
                 
                 ax.grid(True, which="both", ls="--", alpha=0.5)
                 
@@ -293,9 +330,10 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
 
                 y_f = inv_theta * group['f']
                 y_err = inv_theta * group['delta f']
-                y_pred = inv_theta * group['pred']
+                y_pred = inv_theta * group['predimprvnlo']
+                y_predimp = inv_theta * group['pred']
                 y_predNNLL = inv_theta * group['predNNLL']
-                y_predNLO = inv_theta * group['predNLO']
+                
                 # --- Compute y-limits based on the first two datasets only (ignoring NaNs or <=0 values) ---
                 y_ref = np.concatenate([y_f[y_f > 0], y_pred[y_pred > 0]])
                 ymin_plot, ymax_plot = np.nanmin(y_ref), np.nanmax(y_ref)
@@ -308,7 +346,8 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 # --- Plot the first two normally ---
                 ax.errorbar(theta, y_f, yerr=y_err, fmt='o', capsize=3, markersize=3,
                             label=datalabel, alpha=0.6)
-                ax.plot(theta, y_pred, label="Resummed EEC Fit",color='red')
+                ax.plot(theta, y_pred, label="Imprv. LLA+NLO",color='red', linestyle='-')
+                ax.plot(theta, y_predimp, label="Imprv. LLA",color='red', linestyle=':')
 
                 # --- Truncate divergent NNLL curve before plotting ---
                 mask = (y_predNNLL > ymin_plot) & (y_predNNLL < ymax_plot)
@@ -317,7 +356,9 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 #ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
                 
                 # Text inside plot instead of title
-                ax.text(0.05, 0.55, f"Q = {Qval} GeV\n{notefig}", transform=ax.transAxes,
+                ax.text(0.05, 0.63, f"Q = {Qval} GeV", transform=ax.transAxes,
+                        fontsize=12, fontweight='bold', ha='left', va='top')
+                ax.text(0.06, 0.54, f"{notefig}", transform=ax.transAxes,
                         fontsize=12, fontweight='bold', ha='left', va='top')
                 
                 ax.set_yscale("log")
@@ -346,9 +387,9 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 # Reorder legend handles explicitly
                 handles, labels = ax.get_legend_handles_labels()
                 # Ensure "Theory Fit" first, "PYTHIA" second
-                order = [labels.index(datalabel),labels.index("Collinear NNLL"), labels.index("Resummed EEC Fit")]
+                order = [labels.index(datalabel),labels.index("Imprv. LLA+NLO"),labels.index("Imprv. LLA"), labels.index("Collinear NNLL")]
                 ax.legend([handles[i] for i in order], [labels[i] for i in order],
-                        frameon=False, loc="best", fontsize=12)
+                        frameon=False, loc="lower left", fontsize=11, handlelength = 1.45)
                 
                 ax.grid(True, which="both", ls="--", alpha=0.5)
                 
@@ -358,85 +399,48 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
         plt.savefig(f"Output/{filename}",
                     dpi=300, bbox_inches='tight')
         plt.close(fig)
-        
+
 if __name__ == '__main__':
-    pool = Pool()
-    init_params = {
-        "muOverE": 1.0,
-        "Gammaq": 0.754,
-        "Gammag": 0.824,
-        "bmax": 1.5,
-        "gq": 1.0,
-        "gg": 1.0,
-        "fq": 1,
-        "fg": 0,
-        "norm": 0.6*0.346,
-        #"MU0": 100
-    }
     
+    pool = Pool()
+
     init_params_improve = {
         "muOverE": 1.0,
         "Gammaq": 0.754,
         "Gammag": 0.824,
         "bmax": 1.5,
-        "gq": 1.0,
-        "gg": 1.0,
+        "gnonpert": 3.75,
         "fq": 1,
         "fg": 0,
-        "norm": 0.5,
+        "norm": 0.42,
         "MU0": 20,
-        "Lambda": 1.2,
     }
 
-    '''
-    Export_Mode = 1
-    TestDF = cost_EEC(**init_params)
-    plot_EEC_by_theta(TestDF)
-    print(TestDF['cost'].sum()/len(TestDF))
-    '''
-    fixed_params = ["Gammaq", "Gammag",
-                    #"muOverE",
-                    "bmax",
-                    #"gq",
-                    #"gg",
-                    "fq","fg",
-                    #"norm"
-                    ] 
     
     fixed_params_improve = ["Gammaq", "Gammag",
                     "muOverE",
                     "bmax",
-                    #"gq",
-                    "gg",
                     "fq","fg",
                     "MU0",
-                    "Lambda",
                     #"norm"
                     ] 
     
-    #'''
     time_start = time.time()
     
     EECdata = EECdata2
-        
-    '''
-    m = Minuit(cost_EEC, **init_params)
 
-    for name in fixed_params:
-        m.fixed[name] = True
-    '''
+    Fit_Counter = 0
+    #'''
     m = Minuit(cost_EECimprov, **init_params_improve)
 
     for name in fixed_params_improve:
         m.fixed[name] = True
         
-    m.limits['gq'] = (0.1,30)
-    m.limits['gg'] = (0.1,30)
+    m.limits['gnonpert'] = (0.1,30)
     m.limits['norm'] = (0.1,5)
     m.limits['muOverE'] = (0.01,10)
     m.limits['bmax'] = (1,3.5)
     m.limits['MU0'] = (20,1000)
-    m.limits['Lambda'] = (0,30)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
@@ -454,28 +458,32 @@ if __name__ == '__main__':
         
     best_fit_params = m.values.to_dict()
     
-    best_fit_params["norm"] = 1.0
-    Export_Mode = 1
-    Export_Filename = 'Results_improv_Exp.csv'
-    EECdata = EECdata1
-    #TestDF = cost_EEC(**best_fit_params)
-    TestDF = cost_EECimprov(**best_fit_params)
-    
-    best_fit_params["norm"] = 4/9*0.5/1.15
-    Export_Mode = 1
-    Export_Filename = 'Results_improv_Exp2.csv'
-    EECdata = EECdata3
-    #TestDF = cost_EEC(**best_fit_params)
-    TestDF2 = cost_EECimprov(**best_fit_params)
-    note = ["TASSO","TASSO","TOPAZ","TOPAZ","ALEPH (Note)","OPAL"]
-    plot_EEC_by_theta_exp(pd.concat([TestDF, TestDF2]), filename="Fit_EEC_Exp_Comb.pdf", datalabel="Experiment", Note=note)
-    
-    best_fit_params["norm"] = 0.407
     Export_Mode = 1
     Export_Filename = 'Results_improv_Sim.csv'
     EECdata = EECdata2
     #TestDF = cost_EEC(**best_fit_params)
     TestDF = cost_EECimprov(**best_fit_params)
     
-    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Sim.pdf", datalabel="PYTHIA")
+    best_fit_params["norm"] = 1.0
+    Export_Mode = 1
+    Export_Filename = 'Results_improv_Exp.csv'
+    EECdata = EECdata1
+    TestDF1 = cost_EECimprov(**best_fit_params)
+    
+    best_fit_params["norm"] = 4/9*0.5/1.15
+    Export_Mode = 1
+    Export_Filename = 'Results_improv_Exp2.csv'
+    EECdata = EECdata3
+    TestDF2 = cost_EECimprov(**best_fit_params)
+    
     #'''
+    
+    #'''
+    TestDF = pd.read_csv('Output/Results_improv_Sim.csv', header=0)
+    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Sim.pdf", datalabel="PYTHIA")
+    TestDF1 = pd.read_csv('Output/Results_improv_Exp.csv', header=0)
+    TestDF2 = pd.read_csv('Output/Results_improv_Exp2.csv', header=0)
+    note = ["TASSO","TASSO","TOPAZ","TOPAZ","ALEPH (Note)","OPAL"]
+    plot_EEC_by_theta_exp(pd.concat([TestDF1, TestDF2]), filename="Fit_EEC_Exp_Comb.pdf", datalabel="Experiment", Note=note)
+    #'''
+

@@ -534,15 +534,55 @@ def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonp
 
     return Iq, Ig
 
+def build_GammaImprov_interp_logtheta(
+        Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0,
+        theta_min=1e-6, theta_max=1.0, npts=200):
+
+    # Build grid in log θ
+    log_theta_min = np.log(theta_min)
+    log_theta_max = np.log(theta_max)
+
+    log_thetas = np.linspace(log_theta_min, log_theta_max, npts)
+    thetas = np.exp(log_thetas)
+
+    gammas_q = []
+    gammas_g = []
+
+    for th in thetas:
+        gq, gg = GammaImprov(th, Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0)
+        gammas_q.append(gq)
+        gammas_g.append(gg)
+
+    gammas_q = np.array(gammas_q)
+    gammas_g = np.array(gammas_g)
+
+    # Interpolate γ(log θ)
+    interp_q = interp1d(log_thetas, gammas_q, kind='cubic',
+                        fill_value="extrapolate", assume_sorted=True)
+    interp_g = interp1d(log_thetas, gammas_g, kind='cubic',
+                        fill_value="extrapolate", assume_sorted=True)
+
+    return interp_q, interp_g
+
 def dEECimprovNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonpert: float, nlooplog: int, MU0: float):
     
+    AS = AlphaS(3,5,Q)/(2*np.pi)
+    totpref = tot_xsec_sum(Q,1,5)
+
+    log_theta = np.log(theta)
+    
+    GammaInterp_q, GammaInterp_g = build_GammaImprov_interp_logtheta(
+        Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0
+    )
+    
     def integrand(x):
-        gamma0q, gamma0g = GammaImprov(theta, Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0)
-        gammaxq, gammaxg = GammaImprov(x * theta, Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0) 
-        
-        AS = AlphaS(3,5,Q)/(2*np.pi)
-        
-        totpref = tot_xsec_sum(Q,1,5)
+        # evaluate interpolators at log θ
+        gamma0q = GammaInterp_q(log_theta)
+        gamma0g = GammaInterp_g(log_theta)
+
+        log_x_theta = np.log(x * theta)
+        gammaxq = GammaInterp_q(log_x_theta)
+        gammaxg = GammaInterp_g(log_x_theta)
         
         integrandq = (5* gamma0q * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^4 dx from 0 to 1= 1/5. A factor of 3 for normalization
                     +CF * AS * gammaxq * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
@@ -1251,25 +1291,25 @@ def dEEC_qT_Q_plt():
     Q_values = sorted(df['Q'].unique())
     
     # Create a figure
-    plt.figure(figsize=(5.25,4))
-    
+    plt.figure(figsize=(4.75,2.5))
+    ax = plt.gca()
     # Define a color map
     colors = ['#1f77b4', '#ff7f0e', '#d62728', '#9467bd']
-    
+    ax.axhline(1.0, color="black", linestyle="--", linewidth=1.25, alpha=0.7)
     # Loop over Q values
     for i, Q in enumerate(Q_values):
         
         dfQ = df[df['Q'] == Q].sort_values('qT')
         ratio = np.array(dfQ['dEECimprovNLO']) / np.array(dfQ['dEECimprovSim'])
-        plt.plot(np.array(dfQ['qT']), ratio, color=colors[i], label=f'Relative size adding NLO (Q={Q} GeV)', linestyle='-')
+        plt.plot(np.array(dfQ['qT']), ratio, color=colors[i], label=f'Imprv. LLA+NLO/LLA (Q={Q} GeV)', linestyle='-')
         
         # Plot dEECimprovNLO as dashed line
         #plt.plot(dfQ['qT'],dfQ['dEECimprovNLO'], color=colors[i], label=f'Improved LLA + NLO (Q={Q} GeV)', linestyle='--')
     #'''
     plt.xscale('log') 
     plt.xlabel(r'$q_T$ [GeV]')
-    plt.ylabel(r'$\mathrm{d}\Sigma/\mathrm{d}^2q_T$')
-    plt.title(r'Improved EEC $\mathrm{d}\Sigma/\mathrm{d}^2q_T$ vs $q_T$ for different Q values')
+    plt.ylabel(r'$\mathrm{d}\Sigma^{LLA+NLO}$/$\mathrm{d}\Sigma^{LLA}$')
+    plt.title(r'NLO corrections to improved EEC $\mathrm{d}\Sigma/\mathrm{d}z$ vs $q_T$')
     plt.legend(handlelength=1.35)
     plt.grid(True)
     plt.tight_layout()
@@ -1289,9 +1329,9 @@ if __name__ == '__main__':
     
     Qlst= np.array([50.,100., 200.])
     #Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
-    qT = np.exp(np.linspace(np.log(10**(-3)), np.log(20), 20))
+    qT = np.exp(np.linspace(np.log(10**(-3)), np.log(20), 50))
     
-    #dEEC_qT_Q_Cal(qT, Qlst)
+    dEEC_qT_Q_Cal(qT, Qlst)
     dEEC_qT_Q_plt()
     
     #Gamma_qT_Q_plt(qT, Qlst)

@@ -258,7 +258,7 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                     ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
                     ax.set_xlabel("")
                 else:
-                    ax.set_xlabel(r"$\frac{dEEC}{\theta d\theta}$ v.s. $\theta$")
+                    ax.set_xlabel("")
                     ax.tick_params(axis='x', which='both', bottom=True, top=True, labelbottom=True)
                     #ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
 
@@ -272,7 +272,9 @@ def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
                 ax.grid(True, which="both", ls="--", alpha=0.5)
                 
                 ax_idx += 1
-
+                
+        fig.supxlabel(r"$\mathrm{d}\Sigma_2^{e^+e^-}/(\theta\mathrm{d}\theta)$ v.s. $\theta$", fontsize=14)
+        
         plt.tight_layout(pad=0.5)
         plt.savefig(f"Output/{filename}",
                     dpi=300, bbox_inches='tight')
@@ -308,7 +310,7 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
         # Shared x-axis and tight vertical layout
         fig, axes = plt.subplots(
             nrows_eff, ncols, 
-            figsize=(3.2 * ncols, 2.5 * nrows_eff),
+            figsize=(3.0 * ncols, 2.5 * nrows_eff),
             sharex='col',  # share x-axis only within each column
             gridspec_kw={'hspace': 0.0, 'wspace': 0.0}
         )
@@ -318,7 +320,7 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
         for row in range(nrows_eff):
             for col in range(ncols):
 
-    
+
                 Qval, group = groups[fig_idx + ax_idx]
                 notefig  = Note[fig_idx + ax_idx]
                 group = group[group['theta'] > 0]
@@ -339,13 +341,13 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 ymin_plot, ymax_plot = np.nanmin(y_ref), np.nanmax(y_ref)
 
                 # Add a reasonable margin in log space (e.g., ±0.3 dex)
-                log_margin = 0.3
-                ymin_plot /= 10**log_margin
-                ymax_plot *= 10**log_margin
+                log_margin = 0.5
+                ymin_plot /= 10**0.35
+                ymax_plot *= 10**0.35
 
                 # --- Plot the first two normally ---
                 ax.errorbar(theta, y_f, yerr=y_err, fmt='o', capsize=3, markersize=3,
-                            label=datalabel, alpha=0.6)
+                            label=datalabel, alpha=0.9)
                 ax.plot(theta, y_pred, label="Imprv. LLA+NLO",color='red', linestyle='-')
                 ax.plot(theta, y_predimp, label="Imprv. LLA",color='red', linestyle=':')
 
@@ -356,10 +358,10 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 #ax.plot(theta[mask], y_predNLO[mask], linestyle=':', label="Collinear NLO", color='blue')
                 
                 # Text inside plot instead of title
-                ax.text(0.05, 0.63, f"Q = {Qval} GeV", transform=ax.transAxes,
-                        fontsize=12, fontweight='bold', ha='left', va='top')
-                ax.text(0.06, 0.54, f"{notefig}", transform=ax.transAxes,
-                        fontsize=12, fontweight='bold', ha='left', va='top')
+                ax.text(0.07, 0.62, f"Q = {Qval} GeV", transform=ax.transAxes,
+                        fontsize=11, fontweight='bold', ha='left', va='top')
+                ax.text(0.075, 0.53, f"{notefig}", transform=ax.transAxes,
+                        fontsize=11, fontweight='bold', ha='left', va='top')
                 
                 ax.set_yscale("log")
                 ax.set_xscale("log")
@@ -378,9 +380,9 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 # Only hide x-axis labels for top rows, show for bottom row
                 if row < nrows_eff - 1:
                     ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-                    ax.set_xlabel("")
+                    #ax.set_xlabel("")
                 else:
-                    ax.set_xlabel(r"$\frac{dEEC}{\theta d\theta}$ v.s. $\theta$")
+                    #ax.set_xlabel(r"$\frac{\mathrm{d}{\Sigma_{2}^{e^+e^-}}}{\theta d\theta}$ v.s. $\theta$")
                     ax.tick_params(axis='x', which='both', bottom=True, top=True, labelbottom=True)
                     #ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None, numticks=4))
 
@@ -394,7 +396,8 @@ def plot_EEC_by_theta_exp(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"
                 ax.grid(True, which="both", ls="--", alpha=0.5)
                 
                 ax_idx += 1
-
+        
+        fig.supxlabel(r"$\mathrm{d}\Sigma_2^{e^+e^-}/(\theta\mathrm{d}\theta)$ v.s. $\theta$", fontsize=14)
         plt.tight_layout(pad=0.5)
         plt.savefig(f"Output/{filename}",
                     dpi=300, bbox_inches='tight')
@@ -430,7 +433,7 @@ if __name__ == '__main__':
     EECdata = EECdata2
 
     Fit_Counter = 0
-    #'''
+    '''
     m = Minuit(cost_EECimprov, **init_params_improve)
 
     for name in fixed_params_improve:
@@ -476,7 +479,7 @@ if __name__ == '__main__':
     EECdata = EECdata3
     TestDF2 = cost_EECimprov(**best_fit_params)
     
-    #'''
+    '''
     
     #'''
     TestDF = pd.read_csv('Output/Results_improv_Sim.csv', header=0)

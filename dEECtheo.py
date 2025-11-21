@@ -389,11 +389,10 @@ J = 3 - 1
 NF = 5
 P = 1
 nloop = 3
-mu0 = 2
-#nlooplog = 3
 
 def Gamma_Evo(Gamma_Init: np.array, mu: float, nlooplog: int):
     
+    mu0 = 2.0
     Evo0 = evolop(J, NF, P, mu, mu0, nloop)
     #Evo0=evolop_adapt(mu,mu0,nlooplog)
     Gamma_mu = 1 - np.einsum('i,ij->j', 1-Gamma_Init, Evo0)
@@ -414,6 +413,13 @@ def _Gamma_tilde_Pert_Evo(mu: float, bT: float, nlooplog: int, Gamma_Init_tuple:
 def Gamma_tilde_Perturbative_Evo(Gamma_Init: np.ndarray, mu: float, bT: float, nlooplog: int):
     return _Gamma_tilde_Pert_Evo(mu, bT, nlooplog, tuple(Gamma_Init))
 
+'''
+print(np.array([1.,1.]) @ evolop(J, NF, P, 10, 2, nloop))
+
+print(Gamma_Evo(np.array([0.754,0.824]),10,1))
+
+print(Gamma_tilde_Perturbative_Evo(np.array([0.754,0.824]),10,0.1,1))
+'''
 
 def Cimp(MU:float, qT: float, MU0: float, Lambda: float):
 
@@ -425,7 +431,7 @@ def Cimp(MU:float, qT: float, MU0: float, Lambda: float):
     return np.eye(2) + C_evo* np.exp(-qT**2/Lambda**2)
     #return np.eye(2) + C_evo* np.exp(-qT/Lambda)
 
-BMAX_INTEGRAL = 30
+BMAX_INTEGRAL = 10
 
 '''
 def Gamma_tilde_ResumLLA(Gamma_Init: np.ndarray, Q: float, bT: float, bmax: float, gq: float, gg: float, nlooplog: int):
@@ -494,7 +500,7 @@ def dEECNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float
     
     return result
 
-def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonpert: float, nlooplog: int, MU0: float):
+def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonpert: float, nlooplog: int, MU0: float, cimpoff = False):
 
     # Precompute constants
     cimp = Cimp(Q, theta * Q, MU0, Gnonpert)
@@ -514,9 +520,12 @@ def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonp
         Gamma_NonP = np.exp(-np_factors * bT)
 
         Gamma = Gamma_Pert * Gamma_NonP
-
+        
         gamma_dot = Gamma @ cimp  # 2-vector
-
+        
+        if cimpoff:
+            gamma_dot = Gamma  # Disable Cimp effect
+            
         pref = bT * j0(tQ * bT)
 
         return pref * gamma_dot  # returns shape (2,)
@@ -529,8 +538,8 @@ def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonp
         return integrand(bT)[1]
 
     # Integrate each component
-    Iq, _ = quad(integrand_q, 0, BMAX_INTEGRAL, epsabs=1e-6, epsrel=1e-6, limit=200)
-    Ig, _ = quad(integrand_g, 0, BMAX_INTEGRAL, epsabs=1e-6, epsrel=1e-6, limit=200)
+    Iq, _ = quad(integrand_q, 0, BMAX_INTEGRAL, epsabs=1e-10, epsrel=1e-10, limit=500)
+    Ig, _ = quad(integrand_g, 0, BMAX_INTEGRAL, epsabs=1e-10, epsrel=1e-10, limit=500)
 
     return Iq, Ig
 
@@ -690,6 +699,96 @@ def dEEC_NNLL_resum(z: float, mu: float, nloop_alphaS: int, nf: int):
 
 GammaDF = pd.read_csv("ee_EEC_data/Sum_EEC_ee.txt", sep=r"\s+", header= 0, names = ['Q','f'])
 
+def Gamma_cal(gammaq, gammag, Q, mu, nloop):
+    gint = np.array([gammaq, gammag])
+
+    GammaEvo = Gamma_Evo(gint, mu, 1)
+    GammaEvoq, GammaEvog = GammaEvo
+
+    # Constants
+    CF = 4/3
+    As = AlphaS(3, 5, mu)
+
+    gammaqq = 25/6 * CF
+    gammagq = -7/6 * CF
+
+    # 1-loop expression
+    if nloop == 1:
+        return 0.5 * (1 + GammaEvoq)
+
+    # 2-loop expression
+    if nloop == 2:
+        logQ = np.log(Q**2 / mu**2)
+
+        prefactor = 1 - As/(2*np.pi) * (3/2) * CF
+
+        term1 = 0.5
+        term2 = As/(4*np.pi) * CF * (-89/24 + 3/2 * logQ)
+        term3 = 0.5 * GammaEvoq
+        term4 = As/(4*np.pi) * (
+            (131/12 + gammaqq * logQ) * GammaEvoq
+            + (-71/36 + gammagq * logQ) * GammaEvog
+        )
+
+        return prefactor * (term1 + term2 + term3 + term4)
+
+    raise ValueError("nloop must be 1 or 2.")
+    
+def Gamma_scan_df(Q1lst, gammaq, gammag, Nscan=200):
+    """
+    Q1lst : list or array of Q values (scalars)
+    gammaq, gammag : scalar anomalous dimension inputs
+    Nscan : number of μ points between Q/2 and 2Q
+
+    Returns a Pandas DataFrame with:
+        Q
+        n1_central, n1_min, n1_max, n1_err_minus, n1_err_plus
+        n2_central, n2_min, n2_max, n2_err_minus, n2_err_plus
+    """
+
+    Q1lst = np.array(Q1lst)
+    scan_fracs = np.linspace(0.5, 2.0, Nscan)
+
+    rows = []
+
+    for Q in Q1lst:
+        # === central μ = Q ===
+        g1_c = Gamma_cal(gammaq, gammag, Q, Q, nloop=1)
+        g2_c = Gamma_cal(gammaq, gammag, Q, Q, nloop=2)
+
+        # === scan over μ ===
+        g1_vals = []
+        g2_vals = []
+        for frac in scan_fracs:
+            mu = frac * Q
+            g1_vals.append(Gamma_cal(gammaq, gammag, Q, mu, nloop=1))
+            g2_vals.append(Gamma_cal(gammaq, gammag, Q, mu, nloop=2))
+
+        g1_vals = np.array(g1_vals)
+        g2_vals = np.array(g2_vals)
+
+        g1_min, g1_max = g1_vals.min(), g1_vals.max()
+        g2_min, g2_max = g2_vals.min(), g2_vals.max()
+
+        # Store row
+        rows.append({
+            "Q": Q,
+
+            "n1_central": g1_c,
+            "n1_min": g1_min,
+            "n1_max": g1_max,
+            "n1_err_minus": g1_c - g1_min,
+            "n1_err_plus":  g1_max - g1_c,
+
+            "n2_central": g2_c,
+            "n2_min": g2_min,
+            "n2_max": g2_max,
+            "n2_err_minus": g2_c - g2_min,
+            "n2_err_plus":  g2_max - g2_c,
+        })
+
+    return pd.DataFrame(rows)
+
 def Gamma_cal_plt(GammaDF, GammaDFTheo):
 
     Qlst = np.array(GammaDF['Q'])
@@ -704,15 +803,15 @@ def Gamma_cal_plt(GammaDF, GammaDFTheo):
     n2_low = GammaDFTheo["n2_min"].values 
     n2_high = GammaDFTheo["n2_max"].values 
     
-    plt.figure(figsize=(5.5, 4)) 
+    plt.figure(figsize=(5.85, 3.25)) 
     
     plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"PYTHIA")
     
     plt.plot(Qlst, n1_c,color='magenta',linestyle='--',label = r"LO Theory")
-    plt.fill_between(Qlst, n1_low, n1_high, color='magenta', alpha=0.3)
+    #plt.fill_between(Qlst, n1_low, n1_high, color='magenta', alpha=0.3)
     
     plt.plot(Qlst, n2_c,color='green',label = r"NLO Theory")
-    plt.fill_between(Qlst, n2_low, n2_high, color='green', alpha=0.3)
+    #plt.fill_between(Qlst, n2_low, n2_high, color='green', alpha=0.3)
     
 
     #plt.plot(Qlst, GammaEvolstg,color='blue',label = r"$\Gamma_g$")
@@ -720,15 +819,15 @@ def Gamma_cal_plt(GammaDF, GammaDFTheo):
     #plt.plot(Qlst, 1-GammaEvolstg,color='blue',linestyle='--', markerfacecolor='none',label = r"$\Gamma'_g$")
     
     plt.xlim(12.5, 580) 
-    plt.ylim(0.80, 1.0) 
+    plt.ylim(0.75, 1.0) 
     
-    plt.title(r"Integrated EEC in $e^+e^-$ from PYTHIA and theory", fontsize = 14)
-    plt.xlabel("Q (GeV)", fontsize = 13)
-    plt.ylabel("$\Sigma_2$", fontsize = 13)
+    plt.title(r"Integrated EEC $\Sigma_{2}^{e^+e^-}$ in $e^+e^-$ from PYTHIA and theory", fontsize = 13)
+    plt.xlabel("Q (GeV)", fontsize = 12)
+    plt.ylabel("$\Sigma_2^{e^+e^-}(Q)$", fontsize = 12)
     plt.xscale("log")
     plt.xticks([15, 30, 50, 100, 200, 500], ["15", "30", "50", "100", "200", "500"])
     plt.grid(True)
-    plt.legend(fontsize=13)
+    plt.legend(fontsize=12)
     plt.tight_layout(pad=0.1)
     plt.savefig("Output/IntegratedEEC.pdf", format="pdf") 
 
@@ -997,103 +1096,13 @@ def dEEC_cal_plt(zlst, Q_lst):
     
     plt.savefig("Output/dEECcompare.pdf",bbox_inches='tight')
 
-def Gamma_cal(gammaq, gammag, Q, mu, nloop):
-    gint = np.array([gammaq, gammag])
-
-    GammaEvo = Gamma_Evo(gint, mu, 1)
-    GammaEvoq, GammaEvog = GammaEvo
-
-    # Constants
-    CF = 4/3
-    As = AlphaS(3, 5, mu)
-
-    gammaqq = 25/6 * CF
-    gammagq = -7/6 * CF
-
-    # 1-loop expression
-    if nloop == 1:
-        return 0.5 * (1 + GammaEvoq)
-
-    # 2-loop expression
-    if nloop == 2:
-        logQ =0* np.log(Q**2 / mu**2)
-
-        prefactor = 1 - As/(2*np.pi) * (3/2) * CF
-
-        term1 = 0.5
-        term2 = As/(4*np.pi) * CF * (-89/24 + 3/2 * logQ)
-        term3 = 0.5 * GammaEvoq
-        term4 = As/(4*np.pi) * (
-            (131/12 + gammaqq * logQ) * GammaEvoq
-            + (-71/36 + gammagq * logQ) * GammaEvog
-        )
-
-        return prefactor * (term1 + term2 + term3 + term4)
-
-    raise ValueError("nloop must be 1 or 2.")
-    
-def Gamma_scan_df(Q1lst, gammaq, gammag, Nscan=200):
-    """
-    Q1lst : list or array of Q values (scalars)
-    gammaq, gammag : scalar anomalous dimension inputs
-    Nscan : number of μ points between Q/2 and 2Q
-
-    Returns a Pandas DataFrame with:
-        Q
-        n1_central, n1_min, n1_max, n1_err_minus, n1_err_plus
-        n2_central, n2_min, n2_max, n2_err_minus, n2_err_plus
-    """
-
-    Q1lst = np.array(Q1lst)
-    scan_fracs = np.linspace(0.5, 2.0, Nscan)
-
-    rows = []
-
-    for Q in Q1lst:
-        # === central μ = Q ===
-        g1_c = Gamma_cal(gammaq, gammag, Q, Q, nloop=1)
-        g2_c = Gamma_cal(gammaq, gammag, Q, Q, nloop=2)
-
-        # === scan over μ ===
-        g1_vals = []
-        g2_vals = []
-        for frac in scan_fracs:
-            mu = frac * Q
-            g1_vals.append(Gamma_cal(gammaq, gammag, Q, mu, nloop=1))
-            g2_vals.append(Gamma_cal(gammaq, gammag, Q, mu, nloop=2))
-
-        g1_vals = np.array(g1_vals)
-        g2_vals = np.array(g2_vals)
-
-        g1_min, g1_max = g1_vals.min(), g1_vals.max()
-        g2_min, g2_max = g2_vals.min(), g2_vals.max()
-
-        # Store row
-        rows.append({
-            "Q": Q,
-
-            "n1_central": g1_c,
-            "n1_min": g1_min,
-            "n1_max": g1_max,
-            "n1_err_minus": g1_c - g1_min,
-            "n1_err_plus":  g1_max - g1_c,
-
-            "n2_central": g2_c,
-            "n2_min": g2_min,
-            "n2_max": g2_max,
-            "n2_err_minus": g2_c - g2_min,
-            "n2_err_plus":  g2_max - g2_c,
-        })
-
-    return pd.DataFrame(rows)
+Gammainit = np.array([0.754,0.824])
+bmax = 1.5
+Gnonpert = 3.966
+nlooplog = 1
+MU0= 20
 
 def Gamma_qT_Q_plt(qT, Qlst):
-    
-    Gammainit = np.array([0.754,0.824])
-    bmax = 1.5
-    Gnonpert = 3.75
-    nlooplog=1
-    mu0= 20
     
     def compute_gamma_curve(Q):
         theta = qT / Q
@@ -1102,7 +1111,7 @@ def Gamma_qT_Q_plt(qT, Qlst):
         Gq_vals = []
         Gg_vals = []
         for th in theta:
-            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, mu0)
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -1138,11 +1147,6 @@ def Gamma_qT_Q_plt(qT, Qlst):
     plt.savefig("Output/Gamma_thetaQ.pdf", bbox_inches='tight')
 
 def Gamma_qT_Q_CalcCsv(qT, Qlst):
-    Gammainit = np.array([0.754,0.824])
-    bmax = 1.5
-    Gnonpert = 3.75
-    nlooplog=1
-    mu0= 20
 
     def compute_gamma_curve(Q):
         theta = qT / Q
@@ -1151,7 +1155,7 @@ def Gamma_qT_Q_CalcCsv(qT, Qlst):
         Gq_vals = []
         Gg_vals = []
         for th in theta:
-            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, mu0)
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -1177,14 +1181,42 @@ def Gamma_qT_Q_CalcCsv(qT, Qlst):
     # Save to CSV
     df.to_csv("Output/Gamma_thetaQ_data.csv", index=False)
 
+def Gamma_theta_Q_CalcCsv(theta, Qlst):
+
+    def compute_gamma_curve(Q):
+
+        Gq_vals = []
+        Gg_vals = []
+        for th in theta:
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=True)
+            Gq_vals.append(Iq)
+            Gg_vals.append(Ig)
+
+        return theta, np.array(Gq_vals), np.array(Gg_vals)
+
+    # --------------------------
+    # Collect all data here
+    # --------------------------
+    rows = []
+
+    for Q in Qlst:
+        thetaQ, Gq, Gg = compute_gamma_curve(Q)
+        for theta_val, gq_val, gg_val in zip(thetaQ, Gq, Gg):
+            rows.append({
+                "Q": Q,
+                "qT": np.sin(theta_val) * Q,
+                "gamma_q": gq_val,
+                "gamma_g": gg_val
+            })
+
+    df = pd.DataFrame(rows)
+
+    # Save to CSV
+    df.to_csv("Output/Gamma_thetaQ_data1.csv", index=False)
+
+
 def GammaQ_plt(qTC,qTnp, Qlst):
-    
-    Gammainit = np.array([0.754,0.824])
-    bmax = 1.5
-    Gnonpert = 3.75
-    nlooplog=1
-    mu0= 20
-    
+
     def compute_gamma_curve(qT):
         theta = qT / Qlst
         thetaQ = qT  # since θQ = (qT/Q)*Q = qT
@@ -1193,7 +1225,7 @@ def GammaQ_plt(qTC,qTnp, Qlst):
         Gg_vals = []
         
         for th, Q in zip(theta, Qlst):
-            Iq, Ig = GammaImprov(th, qT/th, Gammainit, bmax, Gnonpert, nlooplog, mu0)
+            Iq, Ig = GammaImprov(th, qT/th, Gammainit, bmax, Gnonpert, nlooplog, MU0)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -1204,8 +1236,8 @@ def GammaQ_plt(qTC,qTnp, Qlst):
     ref5qlst = []
     for Q in Qlst:
         
-        ref3q = np.array([1,0]) @ evolop(J, NF, P, Q, mu0, nloop) @ np.array([1,1])
-        ref5q = np.array([1,0]) @ evolop(J+2, NF, P, Q, mu0, nloop) @ np.array([1,1])
+        ref3q = np.array([1,0]) @ evolop(J, NF, P, Q, MU0, nloop) @ np.array([1,1])
+        ref5q = np.array([1,0]) @ evolop(J+2, NF, P, Q, MU0, nloop) @ np.array([1,1])
         ref3qlst.append(ref3q)
         ref5qlst.append(ref5q)
     
@@ -1213,16 +1245,16 @@ def GammaQ_plt(qTC,qTnp, Qlst):
     Qvals, GqC, GgC = compute_gamma_curve(qTC)
     Qvals, GqNP, GgNP = compute_gamma_curve(qTnp)
     
-    plt.figure(figsize=(5.15,4))
+    plt.figure(figsize=(5.25,3.75))
 
     # Calculated curves with markers
     plt.plot(Qvals, GqC/GqC[0],
             label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTC} GeV)",
-            linestyle='', marker='o', markersize=4, 
+            linestyle='', marker='o', markersize=6, 
             markerfacecolor='none', markeredgecolor='red')
     plt.plot(Qvals, GqNP/GqNP[0],
             label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTnp} GeV)",
-            linestyle='', marker='*', markersize=6,
+            linestyle='', marker='*', markersize=8,
             markerfacecolor='none', markeredgecolor='magenta')
     
     # Reference curves
@@ -1233,35 +1265,25 @@ def GammaQ_plt(qTC,qTnp, Qlst):
 
     plt.xscale("log")
     #plt.yscale("log")
+    plt.ylim(0.63, 1.01) 
     plt.xlabel(r"$\mu$ [GeV]")
-    plt.ylabel(fr"$\Gamma(\mu,q_T)$")
-    plt.title(fr"Improved and normalized jet functions $\Gamma(\mu,q_T)$ vs $\mu$")
+    plt.ylabel(fr"$\Gamma_q^{{\mathrm{{imprv.}}}}(\mu,q_T)$")
+    plt.title(fr"$\mu$-scaling of improved EEC jet functions $\Gamma_q^{{\mathrm{{imprv.}}}}(\mu,q_T)$")
     plt.legend(markerscale=1,handlelength=1.35)
     plt.tight_layout()
+    plt.grid(True, alpha=0.5)
     plt.savefig("Output/Gamma_muscale.pdf", bbox_inches='tight')
 
 def dEECimprovSim_helper(args):
     qT, Q = args
     theta = qT/Q
     
-    Gammainit = np.array([0.754,0.824])
-    bmax = 1.5
-    Gnonpert = 3.75
-    nlooplog=1
-    MU0= 20
-    
     return dEECimprovSim(theta, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
 
 def dEECimprovNLO_helper(args):
     qT, Q = args
     theta = qT/Q
-    
-    Gammainit = np.array([0.754,0.824])
-    bmax = 1.5
-    Gnonpert = 3.75
-    nlooplog=1
-    MU0= 20
-    
+
     return dEECimprovNLO(theta, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
 
 def dEEC_qT_Q_Cal(qT_list, Q_list):
@@ -1314,7 +1336,7 @@ def dEEC_qT_Q_plt():
     plt.grid(True)
     plt.tight_layout()
     #'''
-    plt.savefig("Output/dEEC_thetaQ.pdf", bbox_inches='tight')
+    plt.savefig("Output/NLO_corrections_dEEC.pdf", bbox_inches='tight')
 
 if __name__ == '__main__':
     
@@ -1327,15 +1349,16 @@ if __name__ == '__main__':
     Gamma_cal_plt(GammaDF, dfGamma_theo)
     '''
     
-    Qlst= np.array([50.,100., 200.])
-    #Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
-    qT = np.exp(np.linspace(np.log(10**(-3)), np.log(20), 50))
-    
-    dEEC_qT_Q_Cal(qT, Qlst)
-    dEEC_qT_Q_plt()
+    Qlst= np.array([5.,10., 20.,50.,100.,200.])
+    #qT = np.exp(np.linspace(np.log(10**(-4)), np.log(20), 50))
+    #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
+    thetalst = np.linspace(0.0001, 1.0, 200)
+    #dEEC_qT_Q_Cal(qT, Qlst)
+    #dEEC_qT_Q_plt()
     
     #Gamma_qT_Q_plt(qT, Qlst)
     #Gamma_qT_Q_CalcCsv(qT, Qlst)
+    Gamma_theta_Q_CalcCsv(thetalst, Qlst)
     #GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
@@ -1344,7 +1367,18 @@ if __name__ == '__main__':
     bTlst = np.linspace(10. ** (-6),2,20)
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
+    #'''
+    gammainit=np.array([0.754,0.824])
+    mulst = np.array([5.,10., 20.,50.,100.,200.])
+    gammalst = np.array([Gamma_Evo(gammainit, mu, 1) for mu in mulst])
+    df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
+    df.to_csv("Output/gamma_evo.csv", index=False)
     
+    gammalst = np.array([Gamma_tilde_Perturbative_Evo(gammainit, mu,0.0001, 1) for mu in mulst])
+    df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
+    df.to_csv("Output/gamma_evo2.csv", index=False)
+    
+    #'''
     '''
     gammainit=np.array([0.754,0.824])
     theta_lst = 2*np.exp(np.linspace(np.log(10**(-3.2)), np.log(10**(-0.4)), 50))

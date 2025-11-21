@@ -521,25 +521,18 @@ def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonp
 
         Gamma = Gamma_Pert * Gamma_NonP
         
-        gamma_dot = Gamma @ cimp  # 2-vector
-        
         if cimpoff:
-            gamma_dot = Gamma  # Disable Cimp effect
-            
+            gamma_dot = Gamma
+        else:
+            gamma_dot = Gamma @ cimp
+
         pref = bT * j0(tQ * bT)
 
         return pref * gamma_dot  # returns shape (2,)
 
-    # Wrapper for quad (quad only integrates scalar functions)
-    def integrand_q(bT):
-        return integrand(bT)[0]
-
-    def integrand_g(bT):
-        return integrand(bT)[1]
-
     # Integrate each component
-    Iq, _ = quad(integrand_q, 0, BMAX_INTEGRAL, epsabs=1e-10, epsrel=1e-10, limit=500)
-    Ig, _ = quad(integrand_g, 0, BMAX_INTEGRAL, epsabs=1e-10, epsrel=1e-10, limit=500)
+    I, _ = quad_vec(integrand, 0, BMAX_INTEGRAL, epsabs=1e-10, epsrel=1e-10)
+    Iq, Ig = I
 
     return Iq, Ig
 
@@ -1111,7 +1104,7 @@ def Gamma_qT_Q_plt(qT, Qlst):
         Gq_vals = []
         Gg_vals = []
         for th in theta:
-            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0,  cimpoff=True)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -1122,8 +1115,12 @@ def Gamma_qT_Q_plt(qT, Qlst):
     # --- Quark ---
     for Q in Qlst:
         thetaQ, Gq, Gg = compute_gamma_curve(Q)
-        ax[0].plot(thetaQ, Gq, label=fr"$\bar E$ = {Q:.0f} GeV")
-
+        ax[0].plot(thetaQ, Gq, label=fr"$\bar E$ = {Q:.0f} GeV", linestyle='-')
+    
+    theta2list =np.linspace(3,20,10)
+    
+    ax[0].plot(theta2list, 1.0 /theta2list**2.5, label=fr"$q_T^{{-2.5}}$", linestyle='--', color='black')
+    
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
     ax[0].set_xlabel(r"$\theta \bar E = q_T$")
@@ -1134,8 +1131,10 @@ def Gamma_qT_Q_plt(qT, Qlst):
     # --- Gluon ---
     for Q in Qlst:
         thetaQ, Gq, Gg = compute_gamma_curve(Q)
-        ax[1].plot(thetaQ, Gg, label=fr"$\bar E$ = {Q:.0f} GeV")
+        ax[1].plot(thetaQ, Gg, label=fr"$\bar E$ = {Q:.0f} GeV", linestyle='-')
 
+    ax[1].plot(theta2list, 0.5/theta2list**2.0, label=fr"$q_T^{{-2.0}}$", linestyle='--', color='black')
+    
     ax[1].set_xscale("log")
     ax[1].set_yscale("log")
     ax[1].set_xlabel(r"$\theta \bar E = q_T$")
@@ -1155,7 +1154,7 @@ def Gamma_qT_Q_CalcCsv(qT, Qlst):
         Gq_vals = []
         Gg_vals = []
         for th in theta:
-            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0)
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=True)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -1347,17 +1346,20 @@ if __name__ == '__main__':
     
     Gamma_cal_plt(GammaDF, dfGamma_theo)
     '''
-    
-    Qlst= np.array([5.,10., 20.,50.,100.,200.])
-    #qT = np.exp(np.linspace(np.log(10**(-4)), np.log(20), 50))
+    #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
+          
+    Qlst= np.linspace(5,30,6)
+    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
+    #qT= np.linspace(0.0, 1000, 500)
+    #Qlst = np.exp(np.linspace(np.log(200), np.log(1000), 3))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
-    thetalst = np.linspace(0.0001, 1.0, 200)
+    #thetalst = np.linspace(0.0001, 1.0, 200)
     #dEEC_qT_Q_Cal(qT, Qlst)
     #dEEC_qT_Q_plt()
     
-    #Gamma_qT_Q_plt(qT, Qlst)
-    #Gamma_qT_Q_CalcCsv(qT, Qlst)
-    Gamma_theta_Q_CalcCsv(thetalst, Qlst)
+    Gamma_qT_Q_plt(qT, Qlst)
+    Gamma_qT_Q_CalcCsv(qT, Qlst)
+    #Gamma_theta_Q_CalcCsv(thetalst, Qlst)
     #GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
@@ -1368,16 +1370,16 @@ if __name__ == '__main__':
     '''
     #'''
     gammainit=np.array([0.754,0.824])
-    mulst = np.array([5.,10., 20.,50.,100.,200.])
+    mulst = np.linspace(5,100,20)
     gammalst = np.array([Gamma_Evo(gammainit, mu, 1) for mu in mulst])
     df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
     df.to_csv("Output/gamma_evo.csv", index=False)
     
-    gammalst = np.array([Gamma_tilde_Perturbative_Evo(gammainit, mu,0.0001, 1) for mu in mulst])
-    df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
-    df.to_csv("Output/gamma_evo2.csv", index=False)
-    
+    #gammalst = np.array([Gamma_tilde_Perturbative_Evo(gammainit, mu, 0.005, 1) for mu in mulst])
+    #df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
+    #df.to_csv("Output/gamma_evo2.csv", index=False)
     #'''
+    
     '''
     gammainit=np.array([0.754,0.824])
     theta_lst = 2*np.exp(np.linspace(np.log(10**(-3.2)), np.log(10**(-0.4)), 50))

@@ -6,7 +6,7 @@ from scipy.integrate import quad
 # ======================================
 # Load your data
 # ======================================
-df = pd.read_csv("Output/Gamma_thetaQ_data1.csv")   # replace with your filename
+df = pd.read_csv("Output/Gamma_thetaQ_data.csv")   # replace with your filename
 
 # Unique Q values
 Qvals = sorted(df["Q"].unique())
@@ -90,8 +90,8 @@ def compute_integrals_for_Q(dfQ):
 
     I_q_tail = tail_integral(aq, bq, qT_max)
     I_g_tail = tail_integral(ag, bg, qT_max)
-    #return I_q_0 + I_q_mid, I_g_0 + I_g_mid 
-    return I_q_0 + I_q_mid + I_q_tail, I_g_0 + I_g_mid + I_g_tail
+    return I_q_0 + I_q_mid, I_g_0 + I_g_mid 
+    #return I_q_0 + I_q_mid + I_q_tail, I_g_0 + I_g_mid + I_g_tail
 
 # ======================================
 # Compute all Q values

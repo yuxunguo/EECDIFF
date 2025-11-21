@@ -1214,7 +1214,6 @@ def Gamma_theta_Q_CalcCsv(theta, Qlst):
     # Save to CSV
     df.to_csv("Output/Gamma_thetaQ_data1.csv", index=False)
 
-
 def GammaQ_plt(qTC,qTnp, Qlst):
 
     def compute_gamma_curve(qT):

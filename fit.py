@@ -433,7 +433,7 @@ if __name__ == '__main__':
     EECdata = EECdata2
 
     Fit_Counter = 0
-    '''
+    #'''
     m = Minuit(cost_EECimprov, **init_params_improve)
 
     for name in fixed_params_improve:
@@ -479,7 +479,7 @@ if __name__ == '__main__':
     EECdata = EECdata3
     TestDF2 = cost_EECimprov(**best_fit_params)
     
-    '''
+    #'''
     
     #'''
     TestDF = pd.read_csv('Output/Results_improv_Sim.csv', header=0)

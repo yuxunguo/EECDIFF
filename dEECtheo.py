@@ -586,18 +586,18 @@ def dEECimprovNLO(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gno
         gammaxq = GammaInterp_q(log_x_theta)
         gammaxg = GammaInterp_g(log_x_theta)
         
-        integrandq = (5* gamma0q * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^4 dx from 0 to 1= 1/5. A factor of 3 for normalization
-                    +CF * AS * gammaxq * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
-                    +CF * AS * np.log(1-x)/(1-x) * ((1+x**2)*gammaxq - 2*gamma0q)
-                    -3/2 * CF * AS * 1/(1-x) * (gammaxq - gamma0q))
+        integrandq = (5* x**4 * gamma0q * (1 + AS * CF * (2*np.pi**2/3-9/2)) # Integrate x^4 dx from 0 to 1= 1/5. A factor of 3 for normalization
+                    +CF * AS * x**4 * gammaxq * (2*(1+x**2)/(1-x)*np.log(x)-3/2*x+5/2)
+                    +CF * AS * np.log(1-x)/(1-x) * ((1+x**2)* x** 4 *gammaxq - 2*gamma0q)
+                    -3/2 * CF * AS * 1/(1-x) * (x**4 * gammaxq - gamma0q))
         
-        integrandg = CF * AS * (1+(1-x)**2)/x *np.log(x**2*(1-x)) * gammaxg
+        integrandg = CF * AS * (1+(1-x)**2)/x *np.log(x**2*(1-x)) * x**4 * gammaxg
         
-        return totpref * np.array([integrandq, integrandg])* x**4/2
+        return totpref * np.array([integrandq, integrandg])/2
     
     dEEC, _ = quad_vec(integrand,0,1)
     
-    return (dEEC[0]+dEEC[1]) * Q**2
+    return (dEEC[0] + dEEC[1]) * Q**2
 
 def dEECimprovSim(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonpert: float, nlooplog: int, MU0: float):
     return dEECimprov(theta, Q ,Gamma_Init, bmax, Gnonpert,Gnonpert,1,0,nlooplog,MU0,Gnonpert)
@@ -1321,7 +1321,7 @@ def dEEC_qT_Q_plt():
         
         dfQ = df[df['Q'] == Q].sort_values('qT')
         ratio = np.array(dfQ['dEECimprovNLO']) / np.array(dfQ['dEECimprovSim'])
-        plt.plot(np.array(dfQ['qT']), ratio, color=colors[i], label=f'Imprv. LLA+NLO/LLA (Q={Q} GeV)', linestyle='-')
+        plt.plot(np.array(dfQ['qT']), ratio, color=colors[i], label=fr'Imprv. LLA+NLO/LLA ($\bar{{Q}}$={Q} GeV)', linestyle='-')
         
         # Plot dEECimprovNLO as dashed line
         #plt.plot(dfQ['qT'],dfQ['dEECimprovNLO'], color=colors[i], label=f'Improved LLA + NLO (Q={Q} GeV)', linestyle='--')
@@ -1348,17 +1348,18 @@ if __name__ == '__main__':
     '''
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
-    Qlst= np.linspace(5,30,6)
-    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
+    #Qlst= np.linspace(5,30,6)
+    Qlst= np.array([50.,100.,200])
+    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
     #qT= np.linspace(0.0, 1000, 500)
     #Qlst = np.exp(np.linspace(np.log(200), np.log(1000), 3))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
     #thetalst = np.linspace(0.0001, 1.0, 200)
-    #dEEC_qT_Q_Cal(qT, Qlst)
-    #dEEC_qT_Q_plt()
+    dEEC_qT_Q_Cal(qT, Qlst)
+    dEEC_qT_Q_plt()
     
-    Gamma_qT_Q_plt(qT, Qlst)
-    Gamma_qT_Q_CalcCsv(qT, Qlst)
+    #Gamma_qT_Q_plt(qT, Qlst)
+    #Gamma_qT_Q_CalcCsv(qT, Qlst)
     #Gamma_theta_Q_CalcCsv(thetalst, Qlst)
     #GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
@@ -1368,7 +1369,7 @@ if __name__ == '__main__':
     bTlst = np.linspace(10. ** (-6),2,20)
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
-    #'''
+    '''
     gammainit=np.array([0.754,0.824])
     mulst = np.linspace(5,100,20)
     gammalst = np.array([Gamma_Evo(gammainit, mu, 1) for mu in mulst])
@@ -1378,7 +1379,7 @@ if __name__ == '__main__':
     #gammalst = np.array([Gamma_tilde_Perturbative_Evo(gammainit, mu, 0.005, 1) for mu in mulst])
     #df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
     #df.to_csv("Output/gamma_evo2.csv", index=False)
-    #'''
+    '''
     
     '''
     gammainit=np.array([0.754,0.824])

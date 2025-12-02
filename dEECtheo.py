@@ -538,7 +538,7 @@ def GammaImprov(theta: float, Q: float, Gamma_Init: np.array, bmax: float, Gnonp
 
 def build_GammaImprov_interp_logtheta(
         Q, Gamma_Init, bmax, Gnonpert, nlooplog, MU0,
-        theta_min=1e-6, theta_max=1.0, npts=200):
+        theta_min=1e-6, theta_max=1.0, npts=100):
 
     # Build grid in log θ
     log_theta_min = np.log(theta_min)

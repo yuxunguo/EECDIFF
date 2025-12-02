@@ -9,6 +9,8 @@ import os, time
 from matplotlib import rcParams
 from matplotlib.ticker import MaxNLocator, LogLocator
 
+from fit import cost_EECimprov
+
 EECdata1 = EEC_merged[(EEC_merged['theta']<0.3) & (EEC_merged['Q']>30.) & (EEC_merged['Q']*EEC_merged['theta']<40)].copy().reset_index(drop=True)
 EECdata2 = EEC_Simulate[(EEC_Simulate['theta']<0.3) & (EEC_Simulate['Q']>30.)].copy().reset_index(drop=True)
 EECdata3 = EECAlephNew[EECAlephNew['theta']<0.3].copy().reset_index(drop=True)
@@ -28,8 +30,6 @@ EECdata2 = (
 )
 
 EECdata2.reset_index(drop=True, inplace=True)
-
-EECdata = EECdata2
 
 Fit_Counter = 0
 
@@ -59,41 +59,6 @@ Export_Mode = 0
 
 Export_Filename = "Results_improv_sim.csv"
 
-'''
-def compute_EEC(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log):
-    z = (1 - np.cos(theta)) / 2
-    f = theta * dEEC(theta, muOverE/2 * Q, gamma_init, bmax, gq, gg, fq, fg, nloop_log)
-    dEECz = 2 / np.sin(theta) * f
-    return (theta, Q, f, z, dEECz)
-
-def cost_EEC(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
-             gq: float, gg: float, fq: float, fg: float, norm: float) -> float:
-    """Compute the chi-squared cost function for EEC data."""
-    gamma_init = np.array([Gammaq, Gammag])
-    nloop_log = 1
-    
-    tasks = [
-        (theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log)
-        for theta, Q in zip(EECdata['theta'], EECdata['Q'])
-    ]
-
-    EEC_rows = pool.starmap(compute_EEC, tasks)
-    
-    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz"])
-    
-    EECdataFit = EECdata.copy()
-    # Match predictions to EECdata and compute chi-squared
-    EECdataFit['pred'] = norm*pred_df['dEEC'].values
-    EECdataFit['predz'] = norm*pred_df['dEECz'].values
-    EECdataFit['cost'] = ((EECdataFit['pred'] - EECdataFit['f']) / EECdataFit['delta f'])**2
-
-    if(Export_Mode == 1):
-        EECdataFit.to_csv('Output/Results.csv', index=False)
-        return EECdataFit
-    
-    return EECdataFit['cost'].sum()
-'''
-
 def compute_EECimprov(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop_log, MU0, Lambda):
 
     z = (1 - np.cos(theta)) / 2
@@ -112,8 +77,8 @@ def compute_EECimprov(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop
     
     return (theta, Q, f, z, dEECz, fNNLL, dEECzNNLL, fNLO, dEECzNLO, fimprvnlo, dEECzimprvnlo)
 
-def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
-             gnonpert: float, fq: float, fg: float, norm: float, MU0) -> float:
+def cost_EECimprov_ExpComb(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
+             gnonpert: float, fq: float, fg: float, norm1: float, norm2: float, MU0) -> float:
     """Compute the chi-squared cost function for EEC data."""
     
     global Fit_Counter
@@ -123,37 +88,60 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     gamma_init = np.array([Gammaq, Gammag])
     nloop_log = 1
     
-    tasks = [
+    tasks1 = [
         (theta, Q, muOverE, gamma_init, bmax, gnonpert, gnonpert, fq, fg, nloop_log, MU0, gnonpert)
-        for theta, Q in zip(EECdata['theta'], EECdata['Q'])
+        for theta, Q in zip(EECdata1['theta'], EECdata1['Q'])
     ]
-
-    EEC_rows = pool.starmap(compute_EECimprov, tasks)
+    
+    tasks2 = [
+        (theta, Q, muOverE, gamma_init, bmax, gnonpert, gnonpert, fq, fg, nloop_log, MU0, gnonpert)
+        for theta, Q in zip(EECdata3['theta'], EECdata3['Q'])
+    ]
+    
+    EEC_rows1 = pool.starmap(compute_EECimprov, tasks1)
+    EEC_rows2 = pool.starmap(compute_EECimprov, tasks2)
     
     print('=========================================================')
-    pred_df = pd.DataFrame(EEC_rows, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL", "dEECNLO","dEECzNLO", "dEECimprvnlo","dEECzimprvnlo"])
-    
-    EECdataFit = EECdata.copy()
-    # Match predictions to EECdata and compute chi-squared
-    EECdataFit['pred'] = norm*pred_df['dEEC'].values
-    EECdataFit['predz'] = norm*pred_df['dEECz'].values
-    
-    EECdataFit['predNNLL'] = norm*pred_df['dEECNNLL'].values
-    EECdataFit['predzNNLL'] = norm*pred_df['dEECzNNLL'].values
-    
-    EECdataFit['predNLO'] = norm*pred_df['dEECNLO'].values
-    EECdataFit['predzNLO'] = norm*pred_df['dEECzNLO'].values
-    
-    EECdataFit['predimprvnlo'] = norm*pred_df['dEECimprvnlo'].values
-    EECdataFit['predzimprvnlo'] = norm*pred_df['dEECzimprvnlo'].values
-    
-    EECdataFit['cost'] = ((EECdataFit['predimprvnlo'] - EECdataFit['f']) / EECdataFit['delta f'])**2
+    pred_df1 = pd.DataFrame(EEC_rows1, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL", "dEECNLO","dEECzNLO", "dEECimprvnlo","dEECzimprvnlo"])
+    pred_df2 = pd.DataFrame(EEC_rows2, columns=["theta", "Q", "dEEC", "z", "dEECz", "dEECNNLL","dEECzNNLL", "dEECNLO","dEECzNLO", "dEECimprvnlo","dEECzimprvnlo"])
 
+    EECdataFit1 = EECdata1.copy()
+    EECdataFit2 = EECdata3.copy()
+    # Match predictions to EECdata and compute chi-squared
+    EECdataFit1['pred'] = norm1*pred_df1['dEEC'].values
+    EECdataFit1['predz'] = norm1*pred_df1['dEECz'].values
+    
+    EECdataFit1['predNNLL'] = norm1*pred_df1['dEECNNLL'].values
+    EECdataFit1['predzNNLL'] = norm1*pred_df1['dEECzNNLL'].values
+    
+    EECdataFit1['predNLO'] = norm1*pred_df1['dEECNLO'].values
+    EECdataFit1['predzNLO'] = norm1*pred_df1['dEECzNLO'].values
+    
+    EECdataFit1['predimprvnlo'] = norm1*pred_df1['dEECimprvnlo'].values
+    EECdataFit1['predzimprvnlo'] = norm1*pred_df1['dEECzimprvnlo'].values
+    
+    EECdataFit1['cost'] = ((EECdataFit1['predimprvnlo'] - EECdataFit1['f']) / EECdataFit1['delta f'])**2
+    
+    EECdataFit2['pred'] = norm2*pred_df2['dEEC'].values
+    EECdataFit2['predz'] = norm2*pred_df2['dEECz'].values
+    
+    EECdataFit2['predNNLL'] = norm2*pred_df2['dEECNNLL'].values
+    EECdataFit2['predzNNLL'] = norm2*pred_df2['dEECzNNLL'].values
+    
+    EECdataFit2['predNLO'] = norm2*pred_df2['dEECNLO'].values
+    EECdataFit2['predzNLO'] = norm2*pred_df2['dEECzNLO'].values
+    
+    EECdataFit2['predimprvnlo'] = norm2*pred_df2['dEECimprvnlo'].values
+    EECdataFit2['predzimprvnlo'] = norm2*pred_df2['dEECzimprvnlo'].values
+    
+    EECdataFit2['cost'] = ((EECdataFit2['predimprvnlo'] - EECdataFit2['f']) / EECdataFit2['delta f'])**2
+    
     if(Export_Mode == 1):
+        EECdataFit = pd.concat([EECdataFit1, EECdataFit2]).reset_index(drop=True)
         EECdataFit.to_csv(f'Output/{Export_Filename}', index=False)
         return EECdataFit
     
-    return EECdataFit['cost'].sum()
+    return EECdataFit1['cost'].sum() + EECdataFit2['cost'].sum()
 
 def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
 
@@ -440,7 +428,8 @@ if __name__ == '__main__':
         "gnonpert": 4.4,
         "fq": 1,
         "fg": 0,
-        "norm": 1.0,
+        "norm1": 1.0,
+        "norm2": 1.0,
         "MU0": 20,
     }
 
@@ -450,33 +439,33 @@ if __name__ == '__main__':
                     "bmax",
                     "fq","fg",
                     "MU0",
-                    #"norm"
+                    "norm1",
+                    #"norm2"
                     ] 
     
     time_start = time.time()
     
-    EECdata = EECdata3
-
     Fit_Counter = 0
     #'''
-    m = Minuit(cost_EECimprov, **init_params_improve)
+    m = Minuit(cost_EECimprov_ExpComb, **init_params_improve)
 
     for name in fixed_params_improve:
         m.fixed[name] = True
         
     m.limits['gnonpert'] = (0.1,30)
-    m.limits['norm'] = (0.1,5)
+    m.limits['norm1'] = (0.1,5)
+    m.limits['norm2'] = (0.1,5)
     m.limits['muOverE'] = (0.01,10)
     m.limits['bmax'] = (1,3.5)
     m.limits['MU0'] = (20,1000)
     # Run minimization
     m.migrad()  # Minimize cost
     m.hesse()   # Estimate uncertainties
-    ndof = len(EECdata.index) - m.nfit
+    ndof = len(EECdata1.index) + len(EECdata3.index) - m.nfit
     
     time_end = time.time() -time_start
     
-    with open('Output/Fit_summary_improv.txt', 'w', encoding='utf-8') as f:
+    with open('Output/Fit_summary_improv_Exp_CombFit.txt', 'w', encoding='utf-8') as f:
         print('Total running time: %.1f minutes. Total call of cost function: %3d.\n' % ( time_end/60, m.nfcn), file=f)
         print('The chi squared/d.o.f. is: %.2f / %3d ( = %.2f ).\n' % (m.fval, ndof, m.fval/ndof), file = f)
         print('Below are the final output parameters from iMinuit:', file = f)
@@ -485,34 +474,15 @@ if __name__ == '__main__':
         print(m.params, file = f)
         
     best_fit_params = m.values.to_dict()
-    
-    best_fit_params["norm"] = 0.85/2
     Export_Mode = 1
-    Export_Filename = 'Results_improv_Sim.csv'
-    EECdata = EECdata2
-    #TestDF = cost_EEC(**best_fit_params)
-    TestDF = cost_EECimprov(**best_fit_params)
-    
-    best_fit_params["norm"] = 1.0
-    Export_Mode = 1
-    Export_Filename = 'Results_improv_Exp.csv'
-    EECdata = EECdata1
-    TestDF1 = cost_EECimprov(**best_fit_params)
-    
-    best_fit_params["norm"] = 4/9*0.5/1.15
-    Export_Mode = 1
-    Export_Filename = 'Results_improv_Exp2.csv'
-    EECdata = EECdata3
+    Export_Filename = 'Results_improv_Exp_CombFit.csv'
     TestDF2 = cost_EECimprov(**best_fit_params)
     
     #'''
     
-    #'''
-    TestDF = pd.read_csv('Output/Results_improv_Sim.csv', header=0)
-    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Sim.pdf", datalabel="PYTHIA")
-    TestDF1 = pd.read_csv('Output/Results_improv_Exp.csv', header=0)
-    TestDF2 = pd.read_csv('Output/Results_improv_Exp2.csv', header=0)
+    '''
+    TestDF = pd.read_csv('Output/Results_improv_Exp_CombFit.csv', header=0)
     note = ["TASSO","TASSO","TOPAZ","TOPAZ","ALEPH (Note)","OPAL"]
-    plot_EEC_by_theta_exp(pd.concat([TestDF1, TestDF2]), filename="Fit_EEC_Exp_Comb.pdf", datalabel="Experiment", Note=note)
-    #'''
+    plot_EEC_by_theta_exp(TestDF, filename="Fit_EEC_Exp_CombFit.pdf", datalabel="Experiment", Note=note)
+    '''
 

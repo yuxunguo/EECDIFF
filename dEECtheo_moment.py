@@ -71,10 +71,25 @@ def GammaqTMellin(qT, mu0, mu, Gammainit):
     result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
     return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
 
+def GammaqTMellin_Ref(qT, mu0, mu, Gammainit, fixed_j):
+    
+    # Mellin integrand along contour s = c + i t
+    def mellin_integrand(t, qT, c):
+        s = c + 1j*t
+        Fs = Gammainit(s)
+        evos = evolop(fixed_j, NF, P, mu, mu0, NLOOP_ALPHA_S)
+        Fs= Fs @ evos
+        return (qT**(s) * Fs)  # integrate imaginary part for symmetry
+    
+    c= -0.05
+    tmax = 200
+    result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
+    return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
+'''
 print(gammqT_ref(0.1))
 print(GammaqTMellin(0.1,20,50, gammaqT_Mellin))
-
-def GammaQ_plt(qTC,qTnp, Qlst):
+'''
+def GammaQ_plt(qTsmall, qTlarge, Qlst):
 
     MU0 = 20
     def compute_gamma_curve(qT):
@@ -91,31 +106,36 @@ def GammaQ_plt(qTC,qTnp, Qlst):
         return np.array(Qlst), np.array(Gq_vals), np.array(Gg_vals)
 
     #fig, ax = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=False)
+    
+    qTlarge_Ref = 10*qTlarge
+    
+    qTsmall_Ref = 0.1*qTsmall
+    
     ref3qlst = []
     ref5qlst = []
     for Q in Qlst:
         J = 2
         
-        ref3q = np.array([1,0]) @ evolop(J, NF, P, Q, MU0, NLOOP_ALPHA_S) @ np.array([1,1])
-        ref5q = np.array([1,0]) @ evolop(J+2, NF, P, Q, MU0, NLOOP_ALPHA_S) @ np.array([1,1])
+        #ref3q = np.array([1,0]) @ evolop(J, NF, P, Q, MU0, NLOOP_ALPHA_S) @ np.array([1,1])
+        #ref5q = np.array([1,0]) @ evolop(J+2, NF, P, Q, MU0, NLOOP_ALPHA_S) @ np.array([1,1])
+        ref3q, ref3g = GammaqTMellin_Ref(qTlarge_Ref, MU0, Q, gammaqT_Mellin, J)
+        ref5q, ref5g = GammaqTMellin_Ref(qTsmall_Ref, MU0, Q, gammaqT_Mellin, J+2)
         ref3qlst.append(ref3q)
         ref5qlst.append(ref5q)
     
     
-    Qvals, GqC, GgC = compute_gamma_curve(qTC)
-    Qvals, GqNP, GgNP = compute_gamma_curve(qTnp)
+    Qvals, GqqTsmall, GgqTsmall = compute_gamma_curve(qTsmall)
+    Qvals, GqqTlarge, GgqTlarge = compute_gamma_curve(qTlarge)
     
-    print(GqNP/GqNP[0])
-    print( np.array(ref3qlst)/ref3qlst[0])
     plt.figure(figsize=(5.25,3.75))
 
     # Calculated curves with markers
-    plt.plot(Qvals, GqC/GqC[0],
-            label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTC} GeV)",
+    plt.plot(Qvals, GqqTsmall/GqqTsmall[0],
+            label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTsmall} GeV)",
             linestyle='', marker='o', markersize=6, 
             markerfacecolor='none', markeredgecolor='red')
-    plt.plot(Qvals, GqNP/GqNP[0],
-            label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTnp} GeV)",
+    plt.plot(Qvals, GqqTlarge/GqqTlarge[0],
+            label=fr"$\Gamma_q^{{\rm{{Imprv.}}}}$ ($\mu$,$q_T$ = {qTlarge} GeV)",
             linestyle='', marker='*', markersize=8,
             markerfacecolor='none', markeredgecolor='magenta')
     

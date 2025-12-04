@@ -1091,7 +1091,7 @@ def dEEC_cal_plt(zlst, Q_lst):
 
 Gammainit = np.array([0.754,0.824])
 bmax = 1.5
-Gnonpert = 3.966
+Gnonpert = 4.371
 nlooplog = 1
 MU0= 20
 
@@ -1348,15 +1348,15 @@ if __name__ == '__main__':
     '''
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
-    #Qlst= np.linspace(5,30,6)
-    Qlst= np.array([50.,100.,200])
-    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
+    Qlst= np.linspace(5,30,6)
+    #Qlst= np.array([50.,100.,200])
+    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
     #qT= np.linspace(0.0, 1000, 500)
-    #Qlst = np.exp(np.linspace(np.log(200), np.log(1000), 3))
+    #Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
     #thetalst = np.linspace(0.0001, 1.0, 200)
-    dEEC_qT_Q_Cal(qT, Qlst)
-    dEEC_qT_Q_plt()
+    #dEEC_qT_Q_Cal(qT, Qlst)
+    #dEEC_qT_Q_plt()
     
     #Gamma_qT_Q_plt(qT, Qlst)
     #Gamma_qT_Q_CalcCsv(qT, Qlst)
@@ -1369,7 +1369,7 @@ if __name__ == '__main__':
     bTlst = np.linspace(10. ** (-6),2,20)
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
-    '''
+    #'''
     gammainit=np.array([0.754,0.824])
     mulst = np.linspace(5,100,20)
     gammalst = np.array([Gamma_Evo(gammainit, mu, 1) for mu in mulst])
@@ -1379,7 +1379,7 @@ if __name__ == '__main__':
     #gammalst = np.array([Gamma_tilde_Perturbative_Evo(gammainit, mu, 0.005, 1) for mu in mulst])
     #df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
     #df.to_csv("Output/gamma_evo2.csv", index=False)
-    '''
+    #'''
     
     '''
     gammainit=np.array([0.754,0.824])

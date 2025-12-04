@@ -440,7 +440,7 @@ if __name__ == '__main__':
         "gnonpert": 4.4,
         "fq": 1,
         "fg": 0,
-        "norm": 1.0,
+        "norm": 0.85/2,
         "MU0": 20,
     }
 
@@ -450,12 +450,12 @@ if __name__ == '__main__':
                     "bmax",
                     "fq","fg",
                     "MU0",
-                    #"norm"
+                    "norm"
                     ] 
     
     time_start = time.time()
     
-    EECdata = EECdata3
+    EECdata = EECdata2
 
     Fit_Counter = 0
     #'''

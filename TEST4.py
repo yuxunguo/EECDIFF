@@ -12,7 +12,7 @@ from scipy.optimize import curve_fit
 
 df = pd.read_csv("Output/Gamma_thetaQ_data.csv")
 
-df = df[df['Q'] == 10.0]
+df = df[df['Q'] == 20.0]
 
 qT = df["qT"].values
 gamma_q = df["gamma_q"].values
@@ -45,8 +45,10 @@ popt_g_pow, pcov_g_pow   = curve_fit(fit_power, qT, gamma_g, p0=[0.05, 0.3, 0.0]
 print("\n--- Fit parameters ---")
 print("gamma_q (exp):  ", popt_q_exp)
 print("gamma_q (power):", popt_q_pow)
+print(popt_q_pow[0]/ popt_q_pow[1]**2)
 print("gamma_g (exp):  ", popt_g_exp)
 print("gamma_g (power):", popt_g_pow)
+print(popt_g_pow[0]/ popt_g_pow[1]**2)
 
 # ---------------------------------------------------------
 # 4) Plot data vs fits

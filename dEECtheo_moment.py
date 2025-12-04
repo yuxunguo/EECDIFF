@@ -26,6 +26,7 @@ BMAX_INTEGRAL = 10.0
 NF =5 
 P =1
 NLOOP_ALPHA_S = 3 
+
 def GammaqTLLA(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, nlooplog: int):
     
     def integrand(bT):
@@ -40,9 +41,9 @@ def GammaqTLLA(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: fl
     
     return integral
 
-gammaqT0q = 1
-gammaqT0g = 1
-LambdaqT = 2
+gammaqT0q = 0.03782223
+gammaqT0g = 0.03090976
+LambdaqT = 3.4004869
 
 def gammqT_ref(qT):
     resultq = gammaqT0q/(1+(qT/LambdaqT)**2)
@@ -55,6 +56,21 @@ def gammaqT_Mellin(s):
     resultg = -np.pi/2 * gammaqT0g * LambdaqT ** (-s) /np.sin(np.pi*s/2)
     
     return np.array([resultq, resultg])
+
+def GammaqTMellin_Ref(qT, mu0, mu, Gammainit, fixed_j):
+    
+    # Mellin integrand along contour s = c + i t
+    def mellin_integrand(t, qT, c):
+        s = c + 1j*t
+        Fs = Gammainit(s)
+        evos = evolop(fixed_j, NF, P, mu, mu0, NLOOP_ALPHA_S)
+        Fs= Fs @ evos
+        return (qT**(s) * Fs)  # integrate imaginary part for symmetry
+    
+    c= -0.05
+    tmax = 200
+    result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
+    return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
 
 def GammaqTMellin(qT, mu0, mu, Gammainit):
     
@@ -71,27 +87,9 @@ def GammaqTMellin(qT, mu0, mu, Gammainit):
     result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
     return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
 
-def GammaqTMellin_Ref(qT, mu0, mu, Gammainit, fixed_j):
+def Unintegrated_EEC_Jet_Scaling_Plt(qTsmall, qTlarge, Qlst):
     
-    # Mellin integrand along contour s = c + i t
-    def mellin_integrand(t, qT, c):
-        s = c + 1j*t
-        Fs = Gammainit(s)
-        evos = evolop(fixed_j, NF, P, mu, mu0, NLOOP_ALPHA_S)
-        Fs= Fs @ evos
-        return (qT**(s) * Fs)  # integrate imaginary part for symmetry
-    
-    c= -0.05
-    tmax = 200
-    result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
-    return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
-'''
-print(gammqT_ref(0.1))
-print(GammaqTMellin(0.1,20,50, gammaqT_Mellin))
-'''
-def GammaQ_plt(qTsmall, qTlarge, Qlst):
-
-    MU0 = 20
+    MU0 = 20.0
     def compute_gamma_curve(qT):
 
         Gq_vals = []
@@ -156,6 +154,92 @@ def GammaQ_plt(qTsmall, qTlarge, Qlst):
     plt.grid(True, alpha=0.5)
     plt.savefig("Output_Mellin/Gamma_muscale.pdf", bbox_inches='tight')
 
-Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
+def Unintegrated_EEC_Jet_Table(qT, Qlst):
 
-GammaQ_plt(1.0, 20.0, Qlst)
+    MU0 = 20.0
+    def compute_gamma_curve(Q):
+
+        Gq_vals = []
+        Gg_vals = []
+        for qT_val in qT:
+            Iq, Ig = GammaqTMellin(qT_val, MU0, Q, gammaqT_Mellin)
+            Gq_vals.append(Iq)
+            Gg_vals.append(Ig)
+
+        return qT, np.array(Gq_vals), np.array(Gg_vals)
+
+    # --------------------------
+    # Collect all data here
+    # --------------------------
+    rows = []
+
+    for Q in Qlst:
+        thetaQ, Gq, Gg = compute_gamma_curve(Q)
+        for qT_val, gq_val, gg_val in zip(qT, Gq, Gg):
+            rows.append({
+                "Q": Q,
+                "qT": qT_val,
+                "gamma_q": gq_val,
+                "gamma_g": gg_val
+            })
+
+    df = pd.DataFrame(rows)
+
+    # Save to CSV
+    df.to_csv("Output_Mellin/Gamma_thetaQ_data_Comp.csv", index=False)
+
+def Unintegrated_EEC_Jet_Plot():
+    
+    df = pd.read_csv("Output_Mellin/Gamma_thetaQ_data_Comp.csv")
+    
+    df2 = pd.read_csv("Output/Gamma_thetaQ_data_Comp.csv")
+    # Get unique Q values
+    Qlst = df['Q'].unique()
+
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=False)
+
+    # --- Quark ---
+    for Q in Qlst:
+        subset = df[df['Q'] == Q]
+        ax[0].plot(subset['qT'], subset['gamma_q'], label=fr"$\bar E$ = {Q:.0f} GeV", linestyle='-')
+        subset2 = df2[df2['Q'] == Q]
+        ax[0].plot(subset2['qT'], subset2['gamma_q'], linestyle='--')
+    
+    ax[0].set_xscale("log")
+    ax[0].set_yscale("log")
+    ax[0].set_xlabel(r"$\theta \bar E = q_T$")
+    ax[0].set_ylabel(r"$\Gamma_q(\theta \bar E)$")
+    ax[0].set_title("Quark Contribution")
+    ax[0].legend()
+
+    # --- Gluon ---
+    for Q in Qlst:
+        subset = df[df['Q'] == Q]
+        ax[1].plot(subset['qT'], subset['gamma_g'], label=fr"$\bar E$ = {Q:.0f} GeV", linestyle='-')
+        subset2 = df2[df2['Q'] == Q]
+        ax[1].plot(subset2['qT'], subset2['gamma_g'], linestyle='--')
+
+    ax[1].set_xscale("log")
+    ax[1].set_yscale("log")
+    ax[1].set_xlabel(r"$\theta \bar E = q_T$")
+    ax[1].set_ylabel(r"$\Gamma_g(\theta \bar{E})$")
+    ax[1].set_title("Gluon Contribution")
+    ax[1].legend()
+
+    plt.tight_layout()
+    plt.savefig("Output_Mellin/Gamma_thetaQ_New.pdf", bbox_inches='tight')
+
+if __name__ == '__main__':
+    '''
+    Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
+
+    Unintegrated_EEC_Jet_Scaling_Plt(1.0, 20.0, Qlst)
+    '''
+    
+    Qlst= np.array([50.,100.,200])
+    
+    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
+    
+    Unintegrated_EEC_Jet_Table(qT, Qlst)
+    
+    Unintegrated_EEC_Jet_Plot()

@@ -1178,7 +1178,7 @@ def Gamma_qT_Q_CalcCsv(qT, Qlst):
     df = pd.DataFrame(rows)
 
     # Save to CSV
-    df.to_csv("Output/Gamma_thetaQ_data.csv", index=False)
+    df.to_csv("Output/Gamma_thetaQ_data_Comp.csv", index=False)
 
 def Gamma_theta_Q_CalcCsv(theta, Qlst):
 
@@ -1355,11 +1355,11 @@ if __name__ == '__main__':
     #Qlst = np.exp(np.linspace(np.log(200), np.log(1000), 3))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
     #thetalst = np.linspace(0.0001, 1.0, 200)
-    dEEC_qT_Q_Cal(qT, Qlst)
-    dEEC_qT_Q_plt()
+    #dEEC_qT_Q_Cal(qT, Qlst)
+    #dEEC_qT_Q_plt()
     
     #Gamma_qT_Q_plt(qT, Qlst)
-    #Gamma_qT_Q_CalcCsv(qT, Qlst)
+    Gamma_qT_Q_CalcCsv(qT, Qlst)
     #Gamma_theta_Q_CalcCsv(thetalst, Qlst)
     #GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)

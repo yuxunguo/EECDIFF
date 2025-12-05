@@ -236,7 +236,7 @@ if __name__ == '__main__':
     Unintegrated_EEC_Jet_Scaling_Plt(1.0, 20.0, Qlst)
     '''
     
-    Qlst= np.array([50.,100.,200])
+    Qlst= np.array([20.])
     
     qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
     

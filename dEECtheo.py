@@ -1349,7 +1349,7 @@ if __name__ == '__main__':
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
     #Qlst= np.linspace(5,30,6)
-    Qlst= np.array([50.,100.,200])
+    Qlst= np.array([20.,50.,100.,200.])
     qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
     #qT= np.linspace(0.0, 1000, 500)
     #Qlst = np.exp(np.linspace(np.log(200), np.log(1000), 3))

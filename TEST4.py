@@ -12,7 +12,7 @@ from scipy.optimize import curve_fit
 
 df = pd.read_csv("Output/Gamma_thetaQ_data.csv")
 
-df = df[df['Q'] == 20.0]
+df = df[df['Q'] == 5.0]
 
 qT = df["qT"].values
 gamma_q = df["gamma_q"].values
@@ -28,7 +28,7 @@ def fit_exp(qT, A, B, C):
 
 # B) Rational / power-law form
 def fit_power(qT, A, B, C):
-    return A / (1 + (qT/B) ** 2) 
+    return A / (1 + (qT/B) ** C) 
 
 # ---------------------------------------------------------
 # 3) Fit gamma_q and gamma_g
@@ -64,6 +64,7 @@ plt.scatter(qT, gamma_q, s=12, label="data γ_q", color="black")
 plt.plot(qT_plot, fit_exp(qT_plot, *popt_q_exp), label="exp fit", linewidth=2)
 plt.plot(qT_plot, fit_power(qT_plot, *popt_q_pow), label="power fit", linewidth=2)
 plt.ylabel(r"$\gamma_q$")
+plt.yscale("log")
 plt.legend()
 
 # gamma_g
@@ -73,6 +74,7 @@ plt.plot(qT_plot, fit_exp(qT_plot, *popt_g_exp), label="exp fit", linewidth=2)
 plt.plot(qT_plot, fit_power(qT_plot, *popt_g_pow), label="power fit", linewidth=2)
 plt.ylabel(r"$\gamma_g$")
 plt.xlabel(r"$q_T$")
+plt.yscale("log")
 plt.legend()
 
 plt.tight_layout()

@@ -18,8 +18,8 @@ from scipy.integrate import quad, quad_vec
 from multiprocessing import Pool
 import matplotlib.ticker as ticker
 from itertools import product
-
-from dEECtheo import Gamma_tilde_Perturbative_Evo, evolop
+from scipy.optimize import curve_fit
+from dEECtheo import evolop, GammaImprov
 
 BMAX_INTEGRAL = 10.0
 
@@ -27,33 +27,64 @@ NF =5
 P =1
 NLOOP_ALPHA_S = 3 
 
-def GammaqTLLA(theta: float, Q: float, Gamma_Init: np.array, bmax: float, gq: float, gg: float, nlooplog: int):
+def Unintegrated_EECJet_LLA_Table(qT, Qlst):
     
-    def integrand(bT):
-        bstar = bT / np.sqrt(1 + bT**2 / bmax**2)
-        Gamma_Pert = Gamma_tilde_Perturbative_Evo(Gamma_Init, Q, bstar, nlooplog)
-        Gamma_NonP = np.exp(-np.array([gq, gg]) * bT)
-        Gamma = Gamma_Pert * Gamma_NonP
-        gamma_dot = Gamma
-        return bT * j0(theta * bT * Q) * gamma_dot
-
-    integral, _ = quad_vec(integrand, 0, BMAX_INTEGRAL, epsabs=1e-6, epsrel=1e-6, limit=200)
+    Gammainit = np.array([0.754,0.824])
+    Gnonpert = 4.37
+    nlooplog = 1
+    MU0 = 20.0
+    bmax = 1.5
     
-    return integral
+    def compute_gamma_curve(Q):
+        theta = qT / Q
+        thetaQ = qT  # = qT
 
-gammaqT0q = 0.03782223
-gammaqT0g = 0.03090976
-LambdaqT = 3.4004869
+        Gq_vals = []
+        Gg_vals = []
+        for th in theta:
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=True)
+            Gq_vals.append(Iq)
+            Gg_vals.append(Ig)
 
+        return thetaQ, np.array(Gq_vals), np.array(Gg_vals)
+
+    # --------------------------
+    # Collect all data here
+    # --------------------------
+    rows = []
+
+    for Q in Qlst:
+        thetaQ, Gq, Gg = compute_gamma_curve(Q)
+        for qT_val, gq_val, gg_val in zip(thetaQ, Gq, Gg):
+            rows.append({
+                "Q": Q,
+                "qT": qT_val,
+                "gamma_q": gq_val,
+                "gamma_g": gg_val
+            })
+
+    df = pd.DataFrame(rows)
+
+    # Save to CSV
+    df.to_csv("Output_Mellin/Unintegrated_EECJet_LLA.csv", index=False)
+
+gammaqT0q = 0.0368957
+gammaqT0g = 0.03871427
+LambdaqqT = 4.01766612
+LambdagqT = 4.3998637
+pqqT = 2.45863353
+pgqT = 2.12982032
+    
 def gammqT_ref(qT):
-    resultq = gammaqT0q/(1+(qT/LambdaqT)**2)
-    resultg = gammaqT0g/(1+(qT/LambdaqT)**2)
+    
+    resultq = gammaqT0q/(1+(qT/LambdaqqT)**pqqT)
+    resultg = gammaqT0g/(1+(qT/LambdagqT)**pgqT)
     return np.array([resultq, resultg])
 
 def gammaqT_Mellin(s):
     
-    resultq = -np.pi/2 * gammaqT0q * LambdaqT ** (-s) /np.sin(np.pi*s/2)
-    resultg = -np.pi/2 * gammaqT0g * LambdaqT ** (-s) /np.sin(np.pi*s/2)
+    resultq = -np.pi/pqqT/np.sin(np.pi*s/pqqT) * gammaqT0q * LambdaqqT ** (-s) 
+    resultg = -np.pi/pgqT/np.sin(np.pi*s/pgqT) * gammaqT0g * LambdagqT ** (-s) 
     
     return np.array([resultq, resultg])
 
@@ -87,9 +118,82 @@ def GammaqTMellin(qT, mu0, mu, Gammainit):
     result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
     return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
 
+MatchScale = 5.0
+
+def Unintegrated_EEC_Initial_Fit():
+    
+    Qlst= np.array([5.,10.,20.,50.])    
+    qT = np.exp(np.linspace(np.log(0.1), np.log(50), 60))
+    
+    Unintegrated_EECJet_LLA_Table(qT, Qlst)
+    
+    df = pd.read_csv("Output_Mellin/Unintegrated_EECJet_LLA.csv")
+    df = df[df['Q'] == MatchScale]
+    qT = df["qT"].values
+    gamma_q = df["gamma_q"].values
+    gamma_g = df["gamma_g"].values
+    err_q = 0.10 * gamma_q
+    err_g = 0.10 * gamma_g
+    
+    def fit_power(qT, A, B, C):
+        return A / (1 + (qT/B) ** C) 
+
+    popt_q_pow, pcov_q_pow = curve_fit(
+        fit_power, qT, gamma_q,
+        sigma=err_q,
+        absolute_sigma=True,
+        p0=[0.05, 0.3, 1.0]
+    )
+
+    popt_g_pow, pcov_g_pow = curve_fit(
+        fit_power, qT, gamma_g,
+        sigma=err_g,
+        absolute_sigma=True,
+        p0=[0.05, 0.3, 1.0]
+    )
+
+    print("\n--- Fit parameters ---")
+    print("gamma_q (power):", popt_q_pow)
+    print(popt_q_pow[0]/ popt_q_pow[1]**2)
+    print("gamma_g (power):", popt_g_pow)
+    print(popt_g_pow[0]/ popt_g_pow[1]**2)
+    global gammaqT0q, gammaqT0g, LambdaqqT, LambdagqT, pqqT, pgqT
+
+    gammaqT0q = popt_q_pow[0]
+    LambdaqqT = popt_q_pow[1]
+    pqqT = popt_q_pow[2]
+    
+    gammaqT0g = popt_g_pow[0]
+    LambdagqT = popt_g_pow[1]
+    pgqT = popt_g_pow[2]
+    
+    qT_plot = np.linspace(min(qT), max(qT), 400)
+
+    plt.figure(figsize=(8,6))
+    # gamma_q
+    plt.subplot(2,1,1)
+    plt.scatter(qT, gamma_q, s=12, label="data γ_q", color="black")
+    plt.plot(qT_plot, fit_power(qT_plot, *popt_q_pow), label="power fit", linewidth=2)
+    plt.ylabel(r"$\gamma_q$")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.legend()
+
+    # gamma_g
+    plt.subplot(2,1,2)
+    plt.scatter(qT, gamma_g, s=12, label="data γ_g", color="black")
+    plt.plot(qT_plot, fit_power(qT_plot, *popt_g_pow), label="power fit", linewidth=2)
+    plt.ylabel(r"$\gamma_g$")
+    plt.xlabel(r"$q_T$")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("Output_Mellin/Unintegrated_EEC_Initial_Fit.pdf", bbox_inches='tight')
+
 def Unintegrated_EEC_Jet_Scaling_Plt(qTsmall, qTlarge, Qlst):
     
-    MU0 = 20.0
     def compute_gamma_curve(qT):
 
         Gq_vals = []
@@ -97,7 +201,7 @@ def Unintegrated_EEC_Jet_Scaling_Plt(qTsmall, qTlarge, Qlst):
         
         for Q in Qlst:
             #Iq, Ig = GammaImprov(th, qT/th, Gammainit, bmax, Gnonpert, nlooplog, MU0)
-            Iq, Ig = GammaqTMellin(qT, MU0, Q, gammaqT_Mellin)
+            Iq, Ig = GammaqTMellin(qT, MatchScale, Q, gammaqT_Mellin)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -116,8 +220,8 @@ def Unintegrated_EEC_Jet_Scaling_Plt(qTsmall, qTlarge, Qlst):
         
         #ref3q = np.array([1,0]) @ evolop(J, NF, P, Q, MU0, NLOOP_ALPHA_S) @ np.array([1,1])
         #ref5q = np.array([1,0]) @ evolop(J+2, NF, P, Q, MU0, NLOOP_ALPHA_S) @ np.array([1,1])
-        ref3q, ref3g = GammaqTMellin_Ref(qTlarge_Ref, MU0, Q, gammaqT_Mellin, J)
-        ref5q, ref5g = GammaqTMellin_Ref(qTsmall_Ref, MU0, Q, gammaqT_Mellin, J+2)
+        ref3q, ref3g = GammaqTMellin_Ref(qTlarge_Ref, MatchScale, Q, gammaqT_Mellin, J)
+        ref5q, ref5g = GammaqTMellin_Ref(qTsmall_Ref, MatchScale, Q, gammaqT_Mellin, J+2)
         ref3qlst.append(ref3q)
         ref5qlst.append(ref5q)
     
@@ -156,13 +260,12 @@ def Unintegrated_EEC_Jet_Scaling_Plt(qTsmall, qTlarge, Qlst):
 
 def Unintegrated_EEC_Jet_Table(qT, Qlst):
 
-    MU0 = 20.0
     def compute_gamma_curve(Q):
 
         Gq_vals = []
         Gg_vals = []
         for qT_val in qT:
-            Iq, Ig = GammaqTMellin(qT_val, MU0, Q, gammaqT_Mellin)
+            Iq, Ig = GammaqTMellin(qT_val, MatchScale, Q, gammaqT_Mellin)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -186,24 +289,25 @@ def Unintegrated_EEC_Jet_Table(qT, Qlst):
     df = pd.DataFrame(rows)
 
     # Save to CSV
-    df.to_csv("Output_Mellin/Gamma_thetaQ_data_Comp.csv", index=False)
+    df.to_csv("Output_Mellin/Unintegrated_EECJet_Full.csv", index=False)
 
 def Unintegrated_EEC_Jet_Plot():
     
-    df = pd.read_csv("Output_Mellin/Gamma_thetaQ_data_Comp.csv")
+    df = pd.read_csv("Output_Mellin/Unintegrated_EECJet_Full.csv")
     
-    df2 = pd.read_csv("Output/Gamma_thetaQ_data_Comp.csv")
+    df2 = pd.read_csv("Output_Mellin/Unintegrated_EECJet_LLA.csv")
     # Get unique Q values
     Qlst = df['Q'].unique()
 
     fig, ax = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=False)
 
+    colors = plt.cm.viridis(np.linspace(0, 1, len(Qlst)))
     # --- Quark ---
     for Q in Qlst:
         subset = df[df['Q'] == Q]
-        ax[0].plot(subset['qT'], subset['gamma_q'], label=fr"$\bar E$ = {Q:.0f} GeV", linestyle='-')
+        ax[0].plot(subset['qT'], subset['gamma_q'], label=fr"$\bar E$ = {Q:.0f} GeV (Exact)", linestyle='-', color=colors[np.where(Qlst == Q)[0][0]])
         subset2 = df2[df2['Q'] == Q]
-        ax[0].plot(subset2['qT'], subset2['gamma_q'], linestyle='--')
+        ax[0].plot(subset2['qT'], subset2['gamma_q'], linestyle='--', color=colors[np.where(Qlst == Q)[0][0]])
     
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
@@ -215,9 +319,9 @@ def Unintegrated_EEC_Jet_Plot():
     # --- Gluon ---
     for Q in Qlst:
         subset = df[df['Q'] == Q]
-        ax[1].plot(subset['qT'], subset['gamma_g'], label=fr"$\bar E$ = {Q:.0f} GeV", linestyle='-')
+        ax[1].plot(subset['qT'], subset['gamma_g'], label=fr"$\bar E$ = {Q:.0f} GeV (Exact)", linestyle='-', color=colors[np.where(Qlst == Q)[0][0]])
         subset2 = df2[df2['Q'] == Q]
-        ax[1].plot(subset2['qT'], subset2['gamma_g'], linestyle='--')
+        ax[1].plot(subset2['qT'], subset2['gamma_g'], linestyle='--', color=colors[np.where(Qlst == Q)[0][0]])
 
     ax[1].set_xscale("log")
     ax[1].set_yscale("log")
@@ -229,17 +333,28 @@ def Unintegrated_EEC_Jet_Plot():
     plt.tight_layout()
     plt.savefig("Output_Mellin/Gamma_thetaQ_New.pdf", bbox_inches='tight')
 
+ 
 if __name__ == '__main__':
+
+    #Test that the Mellin-space evolution scales correctly# 
     '''
     Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
-
     Unintegrated_EEC_Jet_Scaling_Plt(1.0, 20.0, Qlst)
     '''
     
-    Qlst= np.array([20.])
+    # Fit the initial condition to the LLA unintegrated EEC Jet functions#
+
+    Unintegrated_EEC_Initial_Fit()
+
+    #Comparison with the  LLA unintegrated EEC Jet functions#
+    #'''
+    Qlst= np.array([5., 50., 200.])
     
     qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
+    
+    Unintegrated_EECJet_LLA_Table(qT, Qlst)
     
     Unintegrated_EEC_Jet_Table(qT, Qlst)
     
     Unintegrated_EEC_Jet_Plot()
+    #'''

@@ -422,7 +422,10 @@ print(Gamma_tilde_Perturbative_Evo(np.array([0.754,0.824]),10,0.1,1))
 '''
 
 def Cimp(MU:float, qT: float, MU0: float, Lambda: float):
-
+    
+    if MU<MU0:
+        return np.eye(2)
+     
     Evo3 = evolop(J, NF, P, MU, MU0, nloop)
     Evo5 = evolop(J+2, NF, P, MU, MU0, nloop)
     

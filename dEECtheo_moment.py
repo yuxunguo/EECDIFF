@@ -27,7 +27,7 @@ NF =5
 P =1
 NLOOP_ALPHA_S = 3 
 
-def Unintegrated_EECJet_LLA_Table(qT, Qlst):
+def Unintegrated_EECJet_LLA_Table(qT, Qlst, cimpoff = True):
     
     Gammainit = np.array([0.754,0.824])
     Gnonpert = 4.37
@@ -42,7 +42,7 @@ def Unintegrated_EECJet_LLA_Table(qT, Qlst):
         Gq_vals = []
         Gg_vals = []
         for th in theta:
-            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=True)
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=cimpoff)
             Gq_vals.append(Iq)
             Gg_vals.append(Ig)
 
@@ -118,7 +118,7 @@ def GammaqTMellin(qT, mu0, mu, Gammainit):
     result, _ = quad_vec(lambda t: mellin_integrand(t, qT, c) + mellin_integrand(-t, qT, c), 0, tmax, limit=200)
     return np.real(result) / 2/np.pi  # 1/pi factor due to symmetry
 
-MatchScale = 5.0
+MatchScale = 20.0
 
 def Unintegrated_EEC_Initial_Fit():
     
@@ -157,15 +157,13 @@ def Unintegrated_EEC_Initial_Fit():
     print(popt_q_pow[0]/ popt_q_pow[1]**2)
     print("gamma_g (power):", popt_g_pow)
     print(popt_g_pow[0]/ popt_g_pow[1]**2)
-    global gammaqT0q, gammaqT0g, LambdaqqT, LambdagqT, pqqT, pgqT
-
-    gammaqT0q = popt_q_pow[0]
-    LambdaqqT = popt_q_pow[1]
-    pqqT = popt_q_pow[2]
     
-    gammaqT0g = popt_g_pow[0]
-    LambdagqT = popt_g_pow[1]
-    pgqT = popt_g_pow[2]
+    params = np.array([popt_q_pow[0], popt_q_pow[1], popt_q_pow[2],
+                   popt_g_pow[0], popt_g_pow[1], popt_g_pow[2]])
+    
+    np.savetxt("Output_Mellin/Init_fit_params.txt", params)
+    print("Saved to Output_Mellin/Init_fit_params.txt")
+    
     
     qT_plot = np.linspace(min(qT), max(qT), 400)
 
@@ -333,7 +331,6 @@ def Unintegrated_EEC_Jet_Plot():
     plt.tight_layout()
     plt.savefig("Output_Mellin/Gamma_thetaQ_New.pdf", bbox_inches='tight')
 
- 
 if __name__ == '__main__':
 
     #Test that the Mellin-space evolution scales correctly# 
@@ -343,16 +340,29 @@ if __name__ == '__main__':
     '''
     
     # Fit the initial condition to the LLA unintegrated EEC Jet functions#
-
+    '''
+    Qlst= np.array([MatchScale])
+    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
+    Unintegrated_EECJet_LLA_Table(qT, Qlst, cimpoff = True)
     Unintegrated_EEC_Initial_Fit()
-
+    '''
     #Comparison with the  LLA unintegrated EEC Jet functions#
     #'''
-    Qlst= np.array([5., 50., 200.])
+    
+    params = np.loadtxt("Output_Mellin/Init_fit_params.txt")
+
+    gammaqT0q  = params[0]
+    LambdaqqT  = params[1]
+    pqqT       = params[2]
+    gammaqT0g  = params[3]
+    LambdagqT  = params[4]
+    pgqT       = params[5]
+
+    Qlst= np.array([5.,20.,50.,100.])
     
     qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
     
-    Unintegrated_EECJet_LLA_Table(qT, Qlst)
+    Unintegrated_EECJet_LLA_Table(qT, Qlst, cimpoff = False)
     
     Unintegrated_EEC_Jet_Table(qT, Qlst)
     

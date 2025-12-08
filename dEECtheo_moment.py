@@ -27,47 +27,6 @@ NF =5
 P =1
 NLOOP_ALPHA_S = 3 
 
-def Unintegrated_EECJet_LLA_Table(qT, Qlst, cimpoff = True):
-    
-    Gammainit = np.array([0.754,0.824])
-    Gnonpert = 4.37
-    nlooplog = 1
-    MU0 = 20.0
-    bmax = 1.5
-    
-    def compute_gamma_curve(Q):
-        theta = qT / Q
-        thetaQ = qT  # = qT
-
-        Gq_vals = []
-        Gg_vals = []
-        for th in theta:
-            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=cimpoff)
-            Gq_vals.append(Iq)
-            Gg_vals.append(Ig)
-
-        return thetaQ, np.array(Gq_vals), np.array(Gg_vals)
-
-    # --------------------------
-    # Collect all data here
-    # --------------------------
-    rows = []
-
-    for Q in Qlst:
-        thetaQ, Gq, Gg = compute_gamma_curve(Q)
-        for qT_val, gq_val, gg_val in zip(thetaQ, Gq, Gg):
-            rows.append({
-                "Q": Q,
-                "qT": qT_val,
-                "gamma_q": gq_val,
-                "gamma_g": gg_val
-            })
-
-    df = pd.DataFrame(rows)
-
-    # Save to CSV
-    df.to_csv("Output_Mellin/Unintegrated_EECJet_LLA.csv", index=False)
-
 gammaqT0q = 0.0368957
 gammaqT0g = 0.03871427
 LambdaqqT = 4.01766612
@@ -256,6 +215,47 @@ def Unintegrated_EEC_Jet_Scaling_Plt(qTsmall, qTlarge, Qlst):
     plt.grid(True, alpha=0.5)
     plt.savefig("Output_Mellin/Gamma_muscale.pdf", bbox_inches='tight')
 
+def Unintegrated_EECJet_LLA_Table(qT, Qlst, cimpoff = True):
+    
+    Gammainit = np.array([0.754,0.824])
+    Gnonpert = 4.37
+    nlooplog = 1
+    MU0 = 20.0
+    bmax = 1.5
+    
+    def compute_gamma_curve(Q):
+        theta = qT / Q
+        thetaQ = qT  # = qT
+
+        Gq_vals = []
+        Gg_vals = []
+        for th in theta:
+            Iq, Ig = GammaImprov(th, Q, Gammainit, bmax, Gnonpert, nlooplog, MU0, cimpoff=cimpoff)
+            Gq_vals.append(Iq)
+            Gg_vals.append(Ig)
+
+        return thetaQ, np.array(Gq_vals), np.array(Gg_vals)
+
+    # --------------------------
+    # Collect all data here
+    # --------------------------
+    rows = []
+
+    for Q in Qlst:
+        thetaQ, Gq, Gg = compute_gamma_curve(Q)
+        for qT_val, gq_val, gg_val in zip(thetaQ, Gq, Gg):
+            rows.append({
+                "Q": Q,
+                "qT": qT_val,
+                "gamma_q": gq_val,
+                "gamma_g": gg_val
+            })
+
+    df = pd.DataFrame(rows)
+
+    # Save to CSV
+    df.to_csv("Output_Mellin/Unintegrated_EECJet_LLA.csv", index=False)
+
 def Unintegrated_EEC_Jet_Table(qT, Qlst):
 
     def compute_gamma_curve(Q):
@@ -358,7 +358,8 @@ if __name__ == '__main__':
     LambdagqT  = params[4]
     pgqT       = params[5]
 
-    Qlst= np.array([5.,20.,50.,100.])
+    #'''
+    Qlst= np.array([5.,20.,50.,200.])
     
     qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
     

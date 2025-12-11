@@ -359,9 +359,9 @@ if __name__ == '__main__':
     pgqT       = params[5]
 
     #'''
-    Qlst= np.array([5.,20.,50.,200.])
+    Qlst= np.linspace(5, 30, 6)
     
-    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 50))
+    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
     
     Unintegrated_EECJet_LLA_Table(qT, Qlst, cimpoff = False)
     

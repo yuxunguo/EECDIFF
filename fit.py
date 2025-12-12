@@ -450,7 +450,7 @@ if __name__ == '__main__':
                     "bmax",
                     "fq","fg",
                     "MU0",
-                    "norm"
+                    #"norm"
                     ] 
     
     time_start = time.time()
@@ -486,20 +486,20 @@ if __name__ == '__main__':
         
     best_fit_params = m.values.to_dict()
     
-    best_fit_params["norm"] = 0.85/2
+    #best_fit_params["norm"] = 0.85/2
     Export_Mode = 1
     Export_Filename = 'Results_improv_Sim.csv'
     EECdata = EECdata2
     #TestDF = cost_EEC(**best_fit_params)
     TestDF = cost_EECimprov(**best_fit_params)
     
-    best_fit_params["norm"] = 1.0
+    best_fit_params["norm"] = best_fit_params["norm"]/0.85*2
     Export_Mode = 1
     Export_Filename = 'Results_improv_Exp.csv'
     EECdata = EECdata1
     TestDF1 = cost_EECimprov(**best_fit_params)
     
-    best_fit_params["norm"] = 4/9*0.5/1.15
+    best_fit_params["norm"] = best_fit_params["norm"] *4/9*0.5/1.15
     Export_Mode = 1
     Export_Filename = 'Results_improv_Exp2.csv'
     EECdata = EECdata3

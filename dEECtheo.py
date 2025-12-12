@@ -812,15 +812,16 @@ def Gamma_cal_plt(GammaDF, GammaDFTheo):
     #plt.plot(Qlst, 1-GammaEvolstg,color='blue',linestyle='--', markerfacecolor='none',label = r"$\Gamma'_g$")
     
     plt.xlim(12.5, 580) 
-    plt.ylim(0.75, 1.0) 
+    plt.ylim(0.80, 1.0) 
     
     plt.title(r"Integrated EEC $\Sigma_{2}^{e^+e^-}$ in $e^+e^-$ from PYTHIA and theory", fontsize = 13)
     plt.xlabel("Q (GeV)", fontsize = 12)
     plt.ylabel("$\Sigma_2^{e^+e^-}(Q)$", fontsize = 12)
     plt.xscale("log")
     plt.xticks([15, 30, 50, 100, 200, 500], ["15", "30", "50", "100", "200", "500"])
+    plt.yticks([0.8, 0.85, 0.9, 0.95, 1.0], ["0.80", "0.85", "0.90", "0.95", "1.00"])
     plt.grid(True)
-    plt.legend(fontsize=12)
+    plt.legend(fontsize=12, loc = "lower right")
     plt.tight_layout(pad=0.1)
     plt.savefig("Output/IntegratedEEC.pdf", format="pdf") 
 
@@ -1262,6 +1263,8 @@ def GammaQ_plt(qTC,qTnp, Qlst):
             label=fr"Reference: $\gamma^5$-scaling", linestyle='--', color = 'magenta')
 
     plt.xscale("log")
+    plt.xticks([50, 100, 200, 500, 1000],
+           ["50", "100", "200", "500", "1000"])
     #plt.yscale("log")
     plt.ylim(0.63, 1.01) 
     plt.xlabel(r"$\mu$ [GeV]")
@@ -1311,7 +1314,7 @@ def dEEC_qT_Q_plt():
     Q_values = sorted(df['Q'].unique())
     
     # Create a figure
-    plt.figure(figsize=(4.75,2.5))
+    plt.figure(figsize=(4.75,3.0))
     ax = plt.gca()
     # Define a color map
     colors = ['#1f77b4', '#ff7f0e', '#d62728', '#9467bd']
@@ -1326,12 +1329,13 @@ def dEEC_qT_Q_plt():
         # Plot dEECimprovNLO as dashed line
         #plt.plot(dfQ['qT'],dfQ['dEECimprovNLO'], color=colors[i], label=f'Improved LLA + NLO (Q={Q} GeV)', linestyle='--')
     #'''
+    plt.ylim(0.98, 1.52)
     plt.xscale('log') 
     plt.xlabel(r'$q_T$ [GeV]')
     plt.ylabel(r'$\mathrm{d}\Sigma^{LLA+NLO}$/$\mathrm{d}\Sigma^{LLA}$')
     plt.title(r'NLO corrections to improved EEC $\mathrm{d}\Sigma/\mathrm{d}z$ vs $q_T$')
     plt.legend(handlelength=1.35)
-    plt.grid(True)
+    plt.grid(True, alpha=0.5)
     plt.tight_layout()
     #'''
     plt.savefig("Output/NLO_corrections_dEEC.pdf", bbox_inches='tight')
@@ -1348,9 +1352,9 @@ if __name__ == '__main__':
     '''
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
-    Qlst= np.linspace(5,30,6)
+    #Qlst= np.linspace(5,30,6)
     #Qlst= np.array([50.,100.,200])
-    qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
+    #qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
     #qT= np.linspace(0.0, 1000, 500)
     #Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
@@ -1369,7 +1373,7 @@ if __name__ == '__main__':
     bTlst = np.linspace(10. ** (-6),2,20)
     Gamma_tilde_cal_plt(gammainit,Qlst,bTlst )
     '''
-    #'''
+    '''
     gammainit=np.array([0.754,0.824])
     mulst = np.linspace(5,100,20)
     gammalst = np.array([Gamma_Evo(gammainit, mu, 1) for mu in mulst])
@@ -1379,7 +1383,7 @@ if __name__ == '__main__':
     #gammalst = np.array([Gamma_tilde_Perturbative_Evo(gammainit, mu, 0.005, 1) for mu in mulst])
     #df = pd.DataFrame(np.column_stack((mulst, gammalst)), columns=["mu", "Gammaq", "Gammag"])
     #df.to_csv("Output/gamma_evo2.csv", index=False)
-    #'''
+    '''
     
     '''
     gammainit=np.array([0.754,0.824])

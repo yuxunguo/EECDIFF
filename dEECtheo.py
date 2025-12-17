@@ -798,7 +798,7 @@ def Gamma_cal_plt(GammaDF, GammaDFTheo):
     
     plt.figure(figsize=(5.85, 3.25)) 
     
-    plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"PYTHIA")
+    plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"PYTHIA8")
     
     plt.plot(Qlst, n1_c,color='magenta',linestyle='--',label = r"LO Theory")
     #plt.fill_between(Qlst, n1_low, n1_high, color='magenta', alpha=0.3)
@@ -1343,13 +1343,13 @@ def dEEC_qT_Q_plt():
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    '''
+    #'''
     Q1lst = np.array(GammaDF['Q'])
     
     dfGamma_theo = Gamma_scan_df(Q1lst, gammaq=0.754, gammag=0.824)
     
     Gamma_cal_plt(GammaDF, dfGamma_theo)
-    '''
+    #'''
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
     #Qlst= np.linspace(5,30,6)

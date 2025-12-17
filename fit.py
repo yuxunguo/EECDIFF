@@ -113,7 +113,7 @@ def compute_EECimprov(theta, Q, muOverE, gamma_init, bmax, gq, gg, fq, fg, nloop
     return (theta, Q, f, z, dEECz, fNNLL, dEECzNNLL, fNLO, dEECzNLO, fimprvnlo, dEECzimprvnlo)
 
 def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
-             gnonpert: float, fq: float, fg: float, norm: float, MU0) -> float:
+             gnonpert: float, fq: float, fg: float, norm: float, norm2: float, MU0) -> float:
     """Compute the chi-squared cost function for EEC data."""
     
     global Fit_Counter
@@ -144,8 +144,8 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     EECdataFit['predNLO'] = norm*pred_df['dEECNLO'].values
     EECdataFit['predzNLO'] = norm*pred_df['dEECzNLO'].values
     
-    EECdataFit['predimprvnlo'] = norm*pred_df['dEECimprvnlo'].values
-    EECdataFit['predzimprvnlo'] = norm*pred_df['dEECzimprvnlo'].values
+    EECdataFit['predimprvnlo'] = norm2*norm*pred_df['dEECimprvnlo'].values
+    EECdataFit['predzimprvnlo'] = norm2*norm*pred_df['dEECzimprvnlo'].values
     
     EECdataFit['cost'] = ((EECdataFit['predimprvnlo'] - EECdataFit['f']) / EECdataFit['delta f'])**2
 
@@ -155,7 +155,7 @@ def cost_EECimprov(muOverE: float, Gammaq: float, Gammag: float, bmax: float,
     
     return EECdataFit['cost'].sum()
 
-def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA"):
+def plot_EEC_by_theta(PlotDF, filename="Fit_EEC_Exp.pdf", datalabel="PYTHIA8"):
 
     # Global font settings
     rcParams.update({
@@ -441,6 +441,7 @@ if __name__ == '__main__':
         "fq": 1,
         "fg": 0,
         "norm": 0.85/2,
+        "norm2": 1.0,
         "MU0": 20,
     }
 
@@ -450,7 +451,8 @@ if __name__ == '__main__':
                     "bmax",
                     "fq","fg",
                     "MU0",
-                    #"norm"
+                    "norm",
+                    "norm2"
                     ] 
     
     time_start = time.time()
@@ -466,6 +468,7 @@ if __name__ == '__main__':
         
     m.limits['gnonpert'] = (0.1,30)
     m.limits['norm'] = (0.1,5)
+    m.limits['norm2'] = (0.1,5)
     m.limits['muOverE'] = (0.01,10)
     m.limits['bmax'] = (1,3.5)
     m.limits['MU0'] = (20,1000)
@@ -486,20 +489,20 @@ if __name__ == '__main__':
         
     best_fit_params = m.values.to_dict()
     
-    #best_fit_params["norm"] = 0.85/2
+    best_fit_params["norm"] = 0.85/2
     Export_Mode = 1
     Export_Filename = 'Results_improv_Sim.csv'
     EECdata = EECdata2
     #TestDF = cost_EEC(**best_fit_params)
     TestDF = cost_EECimprov(**best_fit_params)
     
-    best_fit_params["norm"] = best_fit_params["norm"]/0.85*2
+    best_fit_params["norm"] = 1.0
     Export_Mode = 1
     Export_Filename = 'Results_improv_Exp.csv'
     EECdata = EECdata1
     TestDF1 = cost_EECimprov(**best_fit_params)
     
-    best_fit_params["norm"] = best_fit_params["norm"] *4/9*0.5/1.15
+    best_fit_params["norm"] = 1.0 * 4/9*0.5/1.15
     Export_Mode = 1
     Export_Filename = 'Results_improv_Exp2.csv'
     EECdata = EECdata3
@@ -509,7 +512,7 @@ if __name__ == '__main__':
     
     #'''
     TestDF = pd.read_csv('Output/Results_improv_Sim.csv', header=0)
-    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Sim.pdf", datalabel="PYTHIA")
+    plot_EEC_by_theta(TestDF, filename="Fit_EEC_Sim.pdf", datalabel="PYTHIA8")
     TestDF1 = pd.read_csv('Output/Results_improv_Exp.csv', header=0)
     TestDF2 = pd.read_csv('Output/Results_improv_Exp2.csv', header=0)
     note = ["TASSO","TASSO","TOPAZ","TOPAZ","ALEPH (Note)","OPAL"]

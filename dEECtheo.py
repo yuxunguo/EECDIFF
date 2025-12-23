@@ -1,7 +1,6 @@
 from math import tau
 import numpy as np
 from scipy.special import psi, j0, zeta
-from scipy.integrate import simps
 from typing import Tuple, Union
 import rundec
 import pandas as pd
@@ -1235,8 +1234,8 @@ def GammaQ_plt(qTC,qTnp, Qlst):
     ref5qlst = []
     for Q in Qlst:
         
-        ref3q = np.array([1,0]) @ evolop(J, NF, P, Q, MU0, nloop) @ np.array([1,1])
-        ref5q = np.array([1,0]) @ evolop(J+2, NF, P, Q, MU0, nloop) @ np.array([1,1])
+        ref3q, ref3g = np.array([0.832,0.909]) @ evolop(J, NF, P, Q, MU0, nloop) 
+        ref5q, ref5g = np.array([0.832,0.909]) @ evolop(J+2, NF, P, Q, MU0, nloop)
         ref3qlst.append(ref3q)
         ref5qlst.append(ref5q)
     
@@ -1343,20 +1342,20 @@ def dEEC_qT_Q_plt():
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    #'''
+    '''
     Q1lst = np.array(GammaDF['Q'])
     
     dfGamma_theo = Gamma_scan_df(Q1lst, gammaq=0.754, gammag=0.824)
     
     Gamma_cal_plt(GammaDF, dfGamma_theo)
-    #'''
+    '''
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
     #Qlst= np.linspace(5,30,6)
     #Qlst= np.array([50.,100.,200])
     #qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
     #qT= np.linspace(0.0, 1000, 500)
-    #Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
+    Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
     #thetalst = np.linspace(0.0001, 1.0, 200)
     #dEEC_qT_Q_Cal(qT, Qlst)
@@ -1365,7 +1364,7 @@ if __name__ == '__main__':
     #Gamma_qT_Q_plt(qT, Qlst)
     #Gamma_qT_Q_CalcCsv(qT, Qlst)
     #Gamma_theta_Q_CalcCsv(thetalst, Qlst)
-    #GammaQ_plt(20,1,Qlst)
+    GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
     gammainit = np.array([0.7,0.7])

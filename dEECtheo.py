@@ -701,8 +701,8 @@ def Gamma_cal(gammaq, gammag, Q, mu, nloop):
     CF = 4/3
     As = AlphaS(3, 5, mu)
 
-    gammaqq = 25/6 * CF
-    gammagq = -7/6 * CF
+    gammaqq = 25/12 * CF
+    gammagq = -7/12 * CF
 
     # 1-loop expression
     if nloop == 1:
@@ -718,8 +718,8 @@ def Gamma_cal(gammaq, gammag, Q, mu, nloop):
         term2 = As/(4*np.pi) * CF * (-89/24 + 3/2 * logQ)
         term3 = 0.5 * GammaEvoq
         term4 = As/(4*np.pi) * (
-            (131/12 + gammaqq * logQ) * GammaEvoq
-            + (-71/36 + gammagq * logQ) * GammaEvog
+            (131/12 - gammaqq * logQ) * GammaEvoq
+            + (-71/36 - gammagq * logQ) * GammaEvog
         )
 
         return prefactor * (term1 + term2 + term3 + term4)
@@ -800,10 +800,10 @@ def Gamma_cal_plt(GammaDF, GammaDFTheo):
     plt.plot(Qlst, GammaDF['f'],color='black',marker="o",linestyle="none",label = r"PYTHIA8")
     
     plt.plot(Qlst, n1_c,color='magenta',linestyle='--',label = r"LO Theory")
-    #plt.fill_between(Qlst, n1_low, n1_high, color='magenta', alpha=0.3)
+    plt.fill_between(Qlst, n1_low, n1_high, color='magenta', alpha=0.3)
     
     plt.plot(Qlst, n2_c,color='green',label = r"NLO Theory")
-    #plt.fill_between(Qlst, n2_low, n2_high, color='green', alpha=0.3)
+    plt.fill_between(Qlst, n2_low, n2_high, color='green', alpha=0.3)
     
 
     #plt.plot(Qlst, GammaEvolstg,color='blue',label = r"$\Gamma_g$")
@@ -1342,20 +1342,20 @@ def dEEC_qT_Q_plt():
 if __name__ == '__main__':
     
     # Test of Gamma(mu)
-    '''
+    #'''
     Q1lst = np.array(GammaDF['Q'])
     
     dfGamma_theo = Gamma_scan_df(Q1lst, gammaq=0.754, gammag=0.824)
     
     Gamma_cal_plt(GammaDF, dfGamma_theo)
-    '''
+    #'''
     #print(np.array([1.,1.]) @ evolop(2, NF, P, 100, 10000 , nloop))
           
     #Qlst= np.linspace(5,30,6)
     #Qlst= np.array([50.,100.,200])
     #qT = np.exp(np.linspace(np.log(10**(-2)), np.log(20), 100))
     #qT= np.linspace(0.0, 1000, 500)
-    Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
+    #Qlst = np.exp(np.linspace(np.log(50), np.log(1000), 15))
     #thetalst = #np.exp(np.linspace(np.log(10**(-6)), np.log(1.0), 100))
     #thetalst = np.linspace(0.0001, 1.0, 200)
     #dEEC_qT_Q_Cal(qT, Qlst)
@@ -1364,7 +1364,7 @@ if __name__ == '__main__':
     #Gamma_qT_Q_plt(qT, Qlst)
     #Gamma_qT_Q_CalcCsv(qT, Qlst)
     #Gamma_theta_Q_CalcCsv(thetalst, Qlst)
-    GammaQ_plt(20,1,Qlst)
+    #GammaQ_plt(20,1,Qlst)
     # Test of Gamma_tilde_Perturbative_Evo(mu,bT)
     '''
     gammainit = np.array([0.7,0.7])
